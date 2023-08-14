@@ -7,13 +7,11 @@ import {
   BoxGeometry,
   Mesh,
   MeshStandardMaterial,
-  DirectionalLight,
-  DirectionalLightHelper,
-  PointLight,
-  PointLightHelper
+  Vector3
 } from 'three'
 import { Scene } from 'three'
 import GUI from 'lil-gui'
+import { addDirectionalLight, addPointLight } from '../utils/lights'
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -59,8 +57,8 @@ const init = (canvas: HTMLCanvasElement) => {
 const initScene = () => {
   const showHelper = false
   scene.add(createBoxMesh())
-  addDirectionalLight({ addToGUI: false, showHelper })
-  addPointLight({ addToGUI: false, showHelper })
+  addDirectionalLight(0xffb703, 0.1, new Vector3(0, 11, 1.1), scene, showHelper, gui)
+  addPointLight(0xffb703, 6.6, 11, new Vector3(3, 6, 5), scene, showHelper, gui)
 }
 
 const createBoxMesh = () => {
@@ -68,43 +66,6 @@ const createBoxMesh = () => {
   const material = new MeshStandardMaterial()
   const mesh = new Mesh(box, material)
   return mesh
-}
-
-const addDirectionalLight = ({
-  addToGUI,
-  showHelper
-}: {
-  addToGUI: boolean
-  showHelper: boolean
-}) => {
-  const directionalLight = new DirectionalLight(0xffb703, 0.1)
-  directionalLight.position.set(0, 11, 1.1)
-  scene.add(directionalLight)
-  const helper = new DirectionalLightHelper(directionalLight)
-  showHelper && scene.add(helper)
-
-  if (!addToGUI) return
-  const directionalLightFolder = gui.addFolder('directional light')
-  directionalLightFolder.add(directionalLight, 'intensity', 0, 0.5, 0.05)
-  directionalLightFolder.add(directionalLight.position, 'x', -10, 10)
-  directionalLightFolder.add(directionalLight.position, 'y', -10, 10)
-  directionalLightFolder.add(directionalLight.position, 'z', -10, 10)
-}
-
-const addPointLight = ({ addToGUI, showHelper }: { addToGUI: boolean; showHelper: boolean }) => {
-  const pointLight = new PointLight(0xffb703, 6.6, 11)
-  pointLight.position.set(3, 6, 5)
-  scene.add(pointLight)
-  const helper = new PointLightHelper(pointLight)
-  showHelper && scene.add(helper)
-
-  if (!addToGUI) return
-  const pointLightFolder = gui.addFolder('point light')
-  pointLightFolder.add(pointLight, 'intensity', 0, 15, 0.5)
-  pointLightFolder.add(pointLight, 'distance', 0, 15, 0.5)
-  pointLightFolder.add(pointLight.position, 'x', -10, 10)
-  pointLightFolder.add(pointLight.position, 'y', -10, 10)
-  pointLightFolder.add(pointLight.position, 'z', -10, 10)
 }
 
 const start = () => {
