@@ -9,7 +9,7 @@ import {
 } from 'three'
 
 export const addDirectionalLight = (
-  color: string,
+  color: number | string,
   intensity: number,
   position: Vector3,
   scene: Scene,
@@ -31,7 +31,7 @@ export const addDirectionalLight = (
 }
 
 export const addPointLight = (
-  color: string,
+  color: number | string,
   intensity: number,
   distance: number,
   position: Vector3,
