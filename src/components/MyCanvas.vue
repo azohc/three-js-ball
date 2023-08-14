@@ -57,9 +57,10 @@ const init = (canvas: HTMLCanvasElement) => {
 }
 
 const initScene = () => {
+  const showHelper = false
   scene.add(createBoxMesh())
-  addDirectionalLight({ addToGUI: false, showHelpers: false })
-  addPointLight({ addToGui: false, showHelpers: false })
+  addDirectionalLight({ addToGUI: false, showHelper })
+  addPointLight({ addToGUI: false, showHelper })
 }
 
 const createBoxMesh = () => {
@@ -133,8 +134,6 @@ const initGUI = () => {
 
 <template>
   <canvas id="canvas" ref="canvasRef" />
-  <!-- <canvas id="canvas" ref="canvasRef" :width="width" :height="height" /> -->
-  <!-- <div>hello</div> -->
 </template>
 
 <style scoped>
