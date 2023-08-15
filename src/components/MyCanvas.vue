@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
+
 import {
   PerspectiveCamera,
   WebGLRenderer,
@@ -12,12 +13,16 @@ import {
   PointLight,
   PointLightHelper,
   Mesh,
-  Clock
+  Clock,
+  QuadraticBezierCurve3
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
+
 import Lenis from '@studio-freight/lenis'
 import gsap from 'gsap'
+import { Power3 } from 'gsap'
+
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
 
@@ -128,7 +133,14 @@ const initScene = () => {
 
 const initAnimation = () => {
   if (camera) {
-    cameraAnimation = gsap.fromTo(camera.position, initCameraPosition, { x: 0, y: 2, z: 1 })
+    const v0 = initCameraPosition
+    const v1 = new Vector3(0, 13, 5.5)
+    const v2 = new Vector3(0, 2, 1)
+
+    const curve = new QuadraticBezierCurve3(v0, v1, v2)
+    const keyframes = curve.getPoints(50)
+
+    cameraAnimation = gsap.fromTo(camera.position, v0, { ...v2, keyframes })
     cameraAnimation.pause()
   }
 
@@ -167,7 +179,6 @@ const addBall = async () => {
 }
 
 lenis.on('scroll', (event: any) => {
-  console.log('lenis', event)
   animatedScroll.value = event.animatedScroll
   progress.value = event.progress
 })
@@ -180,10 +191,11 @@ const loop = (timestamp: number) => {
   stats.begin()
   lenis.raf(timestamp)
   const dt = clock.getDelta()
+
   ballMesh && animateBall(ballMesh as Mesh, dt)
   cameraAnimation?.progress(progress.value)
   pointLightAnimation?.progress(progress.value)
-  console.log(pointLight?.intensity)
+
   renderer && camera && renderer.render(scene, camera)
   stats.end()
   requestAnimationFrame(loop)
