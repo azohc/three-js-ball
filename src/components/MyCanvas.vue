@@ -11,7 +11,7 @@ import {
 } from 'three'
 import { Scene } from 'three'
 import GUI from 'lil-gui'
-import { addDirectionalLight, addPointLight } from '../utils/lights'
+import { addDirectionalLight, addPointLight } from '@/utils/lights'
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -56,16 +56,23 @@ const init = (canvas: HTMLCanvasElement) => {
 
 const initScene = () => {
   const showHelper = false
-  scene.add(createBoxMesh())
+
+  // Meshes
+  addBoxMesh()
+
+  // Lights
   addDirectionalLight(0xffb703, 0.1, new Vector3(0, 11, 1.1), scene, showHelper, gui)
   addPointLight(0xffb703, 6.6, 11, new Vector3(3, 6, 5), scene, showHelper, gui)
 }
 
-const createBoxMesh = () => {
+const addBoxMesh = () => {
   const box = new BoxGeometry(3, 3, 3)
   const material = new MeshStandardMaterial()
   const mesh = new Mesh(box, material)
-  return mesh
+
+  scene.add(mesh)
+
+  camera?.lookAt(mesh.position)
 }
 
 const start = () => {
