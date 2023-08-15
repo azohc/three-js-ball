@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useResizeObserver } from '@vueuse/core'
+
 import { PerspectiveCamera, WebGLRenderer, Camera, Vector3, Object3D } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
@@ -25,6 +27,17 @@ onMounted(() => {
   initScene()
   initGUI()
   start()
+})
+
+useResizeObserver(document.documentElement, () => {
+  const w = window.innerWidth
+  const h = window.innerHeight
+  const aspectRatio = w / h
+
+  const pcamera = camera as PerspectiveCamera
+  pcamera.aspect = aspectRatio
+  pcamera.updateProjectionMatrix()
+  renderer && renderer.setSize(w, h)
 })
 
 const init = (canvas: HTMLCanvasElement) => {
