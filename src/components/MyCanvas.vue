@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 import {
@@ -32,6 +32,8 @@ const animatedScroll = ref(0)
 const progress = ref(0)
 let cameraAnimation: gsap.core.Tween | null = null
 let pointLightAnimation: gsap.core.Tween | null = null
+const firstAnimationEnd = 0.5
+const firstAnimationProgress = computed(() => Math.min(1, progress.value / firstAnimationEnd))
 
 // THREE
 let renderer: WebGLRenderer | null = null
@@ -197,8 +199,8 @@ const loop = (timestamp: number) => {
 
   ballMesh && animateBall(ballMesh as Mesh, dt)
   // ballMesh && camera?.lookAt(ballMesh.position)
-  cameraAnimation?.progress(progress.value)
-  pointLightAnimation?.progress(progress.value)
+  cameraAnimation?.progress(firstAnimationProgress.value)
+  pointLightAnimation?.progress(firstAnimationProgress.value)
 
   renderer && camera && renderer.render(scene, camera)
   stats.end()
@@ -207,7 +209,7 @@ const loop = (timestamp: number) => {
 
 const animateBall = (ball: Mesh, delta: number) => {
   const maxSpinSpeed = 7 * delta
-  ball.rotateZ(progress.value * maxSpinSpeed)
+  ball.rotateZ(firstAnimationProgress.value * maxSpinSpeed)
 }
 
 const initGUI = ({ closed }: { closed: boolean }) => {
