@@ -18,8 +18,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
+import Lenis from '@studio-freight/lenis'
 
 const canvasRef = ref<HTMLCanvasElement>()
+
+const lenis = new Lenis()
+const animatedScroll = ref(0)
+const progress = ref(0)
 
 // THREE
 let renderer: WebGLRenderer | null = null
@@ -38,7 +43,7 @@ onMounted(() => {
   if (!canvas) return
   init(canvas)
   initScene()
-  initGUI()
+  // initGUI()
   initStats()
   start()
 })
@@ -57,7 +62,7 @@ useResizeObserver(document.documentElement, () => {
 const init = (canvas: HTMLCanvasElement) => {
   renderer = new WebGLRenderer({
     canvas: canvas
-    // alpha: true,
+    // alpha: true
   })
 
   const w = window.innerWidth,
@@ -71,14 +76,15 @@ const init = (canvas: HTMLCanvasElement) => {
   const far = 111
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
-  camera.position.set(0, 2, 1)
+  // camera.position.set(0, 2, 1)
+  camera.position.set(0, 15, 10)
 
   scene = new Scene()
 }
 
 const initScene = () => {
   const showHelper = false
-  const addToGUI = true
+  const addToGUI = false
 
   // Meshes
   addBall()
@@ -143,12 +149,19 @@ const addBall = async () => {
   ballMesh && scene.add(ballMesh)
 }
 
+lenis.on('scroll', (event: any) => {
+  // console.log('lenis', event)
+  animatedScroll.value = event.animatedScroll
+  progress.value = event.progress
+})
+
 const start = () => {
   requestAnimationFrame(loop)
 }
 
-const loop = () => {
+const loop = (timestamp: number) => {
   stats.begin()
+  lenis.raf(timestamp)
   const dt = clock.getDelta()
   ballMesh && animateBall(ballMesh as Mesh, dt)
   renderer && camera && renderer.render(scene, camera)
@@ -157,7 +170,7 @@ const loop = () => {
 }
 
 const animateBall = (ball: Mesh, delta: number) => {
-  ball.rotateZ(delta)
+  // ball.rotateZ(delta)
 }
 
 const initGUI = () => {

@@ -14,7 +14,9 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@studio-freight/lenis": "^1.0.19",
     "@vueuse/core": "^10.3.0",
+    "gsap": "^3.12.2",
     "pinia": "^2.1.4",
     "stats.js": "^0.17.0",
     "vue": "^3.3.4",
