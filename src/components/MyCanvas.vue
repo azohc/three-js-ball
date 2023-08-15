@@ -21,7 +21,6 @@ import { Scene } from 'three'
 
 import Lenis from '@studio-freight/lenis'
 import gsap from 'gsap'
-import { Power3 } from 'gsap'
 
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
