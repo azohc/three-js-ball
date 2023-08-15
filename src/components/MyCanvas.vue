@@ -7,8 +7,6 @@ import {
   Camera,
   Vector3,
   Object3D,
-  Mesh,
-  Clock,
   DirectionalLightHelper,
   DirectionalLight,
   PointLight,
@@ -32,7 +30,7 @@ let camera: Camera | null = null
 let scene = new Scene()
 let ballMesh: Object3D | null = null
 const gltfLoader = new GLTFLoader()
-const clock = new Clock()
+// const clock = new Clock()
 
 // DEBUG
 const gui = new GUI()
@@ -43,7 +41,7 @@ onMounted(() => {
   if (!canvas) return
   init(canvas)
   initScene()
-  // initGUI()
+  initGUI({ closed: true })
   initStats()
   start()
 })
@@ -84,7 +82,7 @@ const init = (canvas: HTMLCanvasElement) => {
 
 const initScene = () => {
   const showHelper = false
-  const addToGUI = false
+  const addToGUI = true
 
   // Meshes
   addBall()
@@ -162,18 +160,18 @@ const start = () => {
 const loop = (timestamp: number) => {
   stats.begin()
   lenis.raf(timestamp)
-  const dt = clock.getDelta()
-  ballMesh && animateBall(ballMesh as Mesh, dt)
+  // const dt = clock.getDelta()
+  // ballMesh && animateBall(ballMesh as Mesh, dt)
   renderer && camera && renderer.render(scene, camera)
   stats.end()
   requestAnimationFrame(loop)
 }
 
-const animateBall = (ball: Mesh, delta: number) => {
-  // ball.rotateZ(delta)
-}
+// const animateBall = (ball: Mesh, delta: number) => {
+// ball.rotateZ(delta)
+// }
 
-const initGUI = () => {
+const initGUI = ({ closed }: { closed: boolean }) => {
   const initCameraGUI = (camera: Camera) => {
     const cameraFolder = gui.addFolder('camera')
     cameraFolder.add(camera.position, 'x', -10, 10)
@@ -182,6 +180,8 @@ const initGUI = () => {
   }
 
   camera && initCameraGUI(camera)
+
+  closed && gui.close()
 }
 
 const initStats = () => {
