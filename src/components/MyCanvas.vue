@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
-
-import { PerspectiveCamera, WebGLRenderer, Camera, Vector3, Object3D } from 'three'
+import {
+  PerspectiveCamera,
+  WebGLRenderer,
+  Camera,
+  Vector3,
+  Object3D,
+  Mesh,
+  Clock,
+  DirectionalLightHelper,
+  DirectionalLight,
+  PointLight,
+  PointLightHelper
+} from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
 import GUI from 'lil-gui'
 import { addDirectionalLight, addPointLight } from '@/utils/lights'
+import Stats from 'stats.js'
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -14,11 +26,13 @@ const canvasRef = ref<HTMLCanvasElement>()
 let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
-const gltfLoader = new GLTFLoader()
 let ballMesh: Object3D | null = null
+const gltfLoader = new GLTFLoader()
+const clock = new Clock()
 
 // DEBUG
 const gui = new GUI()
+const stats = new Stats()
 
 onMounted(() => {
   const canvas = canvasRef.value
@@ -26,6 +40,7 @@ onMounted(() => {
   init(canvas)
   initScene()
   initGUI()
+  initStats()
   start()
 })
 
@@ -64,13 +79,41 @@ const init = (canvas: HTMLCanvasElement) => {
 
 const initScene = () => {
   const showHelper = false
+  const addToGUI = true
 
   // Meshes
   addBall()
 
   // Lights
-  addDirectionalLight(0xffb703, 0.1, new Vector3(0, 11, 1.1), scene, showHelper, gui)
-  addPointLight(0xffb703, 6.6, 11, new Vector3(3, 6, 5), scene, showHelper, gui)
+  const dl = new DirectionalLight(0xffb703, 0.1)
+  dl.position.copy(new Vector3(0, 11, 1.1))
+  scene.add(dl)
+  const dlh = new DirectionalLightHelper(dl)
+  showHelper && scene.add(dlh)
+
+  if (addToGUI) {
+    const directionalLightFolder = gui.addFolder('directional light')
+    directionalLightFolder.add(dl, 'intensity', 0, 0.5, 0.05)
+    directionalLightFolder.add(dl.position, 'x', -10, 10)
+    directionalLightFolder.add(dl.position, 'y', -10, 10)
+    directionalLightFolder.add(dl.position, 'z', -10, 10)
+  }
+
+  const pointLight = new PointLight(0xffb703, 3, 0, 2)
+  pointLight.position.copy(new Vector3(0, 11, 1.1))
+  scene.add(pointLight)
+  const plh = new PointLightHelper(pointLight)
+  showHelper && scene.add(plh)
+
+  if (addToGUI) {
+    const pointLightFolder = gui.addFolder('point light')
+    pointLightFolder.add(pointLight, 'intensity', 0, 30, 1)
+    pointLightFolder.add(pointLight, 'distance', 0, 30, 1)
+    pointLightFolder.add(pointLight, 'decay', 0, 2, 0.1)
+    pointLightFolder.add(pointLight.position, 'x', -10, 10)
+    pointLightFolder.add(pointLight.position, 'y', -10, 10)
+    pointLightFolder.add(pointLight.position, 'z', -10, 10)
+  }
 }
 
 const addBall = async () => {
@@ -106,12 +149,16 @@ const start = () => {
 }
 
 const loop = () => {
-  // TODO begin stats
-
+  stats.begin()
+  const dt = clock.getDelta()
+  ballMesh && animateBall(ballMesh as Mesh, dt)
   renderer && camera && renderer.render(scene, camera)
-
-  // end stats
+  stats.end()
   requestAnimationFrame(loop)
+}
+
+const animateBall = (ball: Mesh, delta: number) => {
+  ball.rotateZ(delta)
 }
 
 const initGUI = () => {
@@ -123,6 +170,11 @@ const initGUI = () => {
   }
 
   camera && initCameraGUI(camera)
+}
+
+const initStats = () => {
+  stats.showPanel(0)
+  document.body.appendChild(stats.dom)
 }
 </script>
 
