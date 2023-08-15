@@ -10,7 +10,9 @@ import {
   DirectionalLightHelper,
   DirectionalLight,
   PointLight,
-  PointLightHelper
+  PointLightHelper,
+  Mesh,
+  Clock
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
@@ -30,7 +32,7 @@ let camera: Camera | null = null
 let scene = new Scene()
 let ballMesh: Object3D | null = null
 const gltfLoader = new GLTFLoader()
-// const clock = new Clock()
+const clock = new Clock()
 
 // DEBUG
 const gui = new GUI()
@@ -148,7 +150,7 @@ const addBall = async () => {
 }
 
 lenis.on('scroll', (event: any) => {
-  // console.log('lenis', event)
+  console.log('lenis', event)
   animatedScroll.value = event.animatedScroll
   progress.value = event.progress
 })
@@ -160,16 +162,17 @@ const start = () => {
 const loop = (timestamp: number) => {
   stats.begin()
   lenis.raf(timestamp)
-  // const dt = clock.getDelta()
-  // ballMesh && animateBall(ballMesh as Mesh, dt)
+  const dt = clock.getDelta()
+  ballMesh && animateBall(ballMesh as Mesh, dt)
   renderer && camera && renderer.render(scene, camera)
   stats.end()
   requestAnimationFrame(loop)
 }
 
-// const animateBall = (ball: Mesh, delta: number) => {
-// ball.rotateZ(delta)
-// }
+const animateBall = (ball: Mesh, delta: number) => {
+  const maxSpinSpeed = 10 * delta
+  ball.rotateZ(progress.value * maxSpinSpeed)
+}
 
 const initGUI = ({ closed }: { closed: boolean }) => {
   const initCameraGUI = (camera: Camera) => {
