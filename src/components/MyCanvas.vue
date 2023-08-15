@@ -20,7 +20,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
 
 import Lenis from '@studio-freight/lenis'
-import gsap from 'gsap'
+import gsap, { Power3 } from 'gsap'
 
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
@@ -113,7 +113,7 @@ const initScene = () => {
     directionalLightFolder.add(dl.position, 'z', -10, 10)
   }
 
-  pointLight = new PointLight(0xffb703, 1, 0, 0.5)
+  pointLight = new PointLight(0xffd770, 1, 0, 0.5)
   pointLight.position.copy(new Vector3(0, 11, 1.1))
   scene.add(pointLight)
   const plh = new PointLightHelper(pointLight)
@@ -133,8 +133,8 @@ const initScene = () => {
 const initAnimation = () => {
   if (camera) {
     const v0 = initCameraPosition
-    const v1 = new Vector3(0, 13, 5.5)
-    const v2 = new Vector3(0, 2, 1)
+    const v1 = new Vector3(0, 13, 6)
+    const v2 = new Vector3(0, 2, 2)
 
     const curve = new QuadraticBezierCurve3(v0, v1, v2)
     const keyframes = curve.getPoints(50)
@@ -144,7 +144,11 @@ const initAnimation = () => {
   }
 
   if (pointLight) {
-    pointLightAnimation = gsap.fromTo(pointLight, { intensity: 0 }, { intensity: 1 })
+    pointLightAnimation = gsap.fromTo(
+      pointLight,
+      { intensity: 0 },
+      { intensity: 3, ease: Power3.easeIn }
+    )
     pointLightAnimation.pause()
   }
 }
@@ -192,6 +196,7 @@ const loop = (timestamp: number) => {
   const dt = clock.getDelta()
 
   ballMesh && animateBall(ballMesh as Mesh, dt)
+  // ballMesh && camera?.lookAt(ballMesh.position)
   cameraAnimation?.progress(progress.value)
   pointLightAnimation?.progress(progress.value)
 
@@ -201,7 +206,7 @@ const loop = (timestamp: number) => {
 }
 
 const animateBall = (ball: Mesh, delta: number) => {
-  const maxSpinSpeed = 10 * delta
+  const maxSpinSpeed = 7 * delta
   ball.rotateZ(progress.value * maxSpinSpeed)
 }
 
