@@ -16,15 +16,18 @@ import {
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
+import Lenis from '@studio-freight/lenis'
+import gsap from 'gsap'
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
-import Lenis from '@studio-freight/lenis'
 
 const canvasRef = ref<HTMLCanvasElement>()
 
 const lenis = new Lenis()
 const animatedScroll = ref(0)
 const progress = ref(0)
+let cameraAnimation: gsap.core.Tween | null = null
+let pointLightAnimation: gsap.core.Tween | null = null
 
 // THREE
 let renderer: WebGLRenderer | null = null
@@ -33,6 +36,8 @@ let scene = new Scene()
 let ballMesh: Object3D | null = null
 const gltfLoader = new GLTFLoader()
 const clock = new Clock()
+const initCameraPosition = new Vector3(0, 15, 10)
+let pointLight: PointLight | null = null
 
 // DEBUG
 const gui = new GUI()
@@ -43,6 +48,7 @@ onMounted(() => {
   if (!canvas) return
   init(canvas)
   initScene()
+  initAnimation()
   initGUI({ closed: true })
   initStats()
   start()
@@ -76,8 +82,7 @@ const init = (canvas: HTMLCanvasElement) => {
   const far = 111
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
-  // camera.position.set(0, 2, 1)
-  camera.position.set(0, 15, 10)
+  camera.position.copy(initCameraPosition)
 
   scene = new Scene()
 }
@@ -90,7 +95,7 @@ const initScene = () => {
   addBall()
 
   // Lights
-  const dl = new DirectionalLight(0xffb703, 0.1)
+  const dl = new DirectionalLight(0xffb703, 0.05)
   dl.position.copy(new Vector3(0, 11, 1.1))
   scene.add(dl)
   const dlh = new DirectionalLightHelper(dl)
@@ -98,13 +103,13 @@ const initScene = () => {
 
   if (addToGUI) {
     const directionalLightFolder = gui.addFolder('directional light')
-    directionalLightFolder.add(dl, 'intensity', 0, 0.5, 0.05)
+    directionalLightFolder.add(dl, 'intensity', 0, 0.1, 0.01)
     directionalLightFolder.add(dl.position, 'x', -10, 10)
     directionalLightFolder.add(dl.position, 'y', -10, 10)
     directionalLightFolder.add(dl.position, 'z', -10, 10)
   }
 
-  const pointLight = new PointLight(0xffb703, 3, 0, 2)
+  pointLight = new PointLight(0xffb703, 1, 0, 0.5)
   pointLight.position.copy(new Vector3(0, 11, 1.1))
   scene.add(pointLight)
   const plh = new PointLightHelper(pointLight)
@@ -118,6 +123,18 @@ const initScene = () => {
     pointLightFolder.add(pointLight.position, 'x', -10, 10)
     pointLightFolder.add(pointLight.position, 'y', -10, 10)
     pointLightFolder.add(pointLight.position, 'z', -10, 10)
+  }
+}
+
+const initAnimation = () => {
+  if (camera) {
+    cameraAnimation = gsap.fromTo(camera.position, initCameraPosition, { x: 0, y: 2, z: 1 })
+    cameraAnimation.pause()
+  }
+
+  if (pointLight) {
+    pointLightAnimation = gsap.fromTo(pointLight, { intensity: 0 }, { intensity: 1 })
+    pointLightAnimation.pause()
   }
 }
 
@@ -164,6 +181,9 @@ const loop = (timestamp: number) => {
   lenis.raf(timestamp)
   const dt = clock.getDelta()
   ballMesh && animateBall(ballMesh as Mesh, dt)
+  cameraAnimation?.progress(progress.value)
+  pointLightAnimation?.progress(progress.value)
+  console.log(pointLight?.intensity)
   renderer && camera && renderer.render(scene, camera)
   stats.end()
   requestAnimationFrame(loop)
