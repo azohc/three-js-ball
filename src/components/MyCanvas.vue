@@ -13,7 +13,7 @@ let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
 const gltfLoader = new GLTFLoader()
-let ball: { loaded: boolean; mesh: Object3D | null } = { loaded: false, mesh: null }
+let ballMesh: Object3D | null = null
 
 // DEBUG
 const gui = new GUI()
@@ -53,25 +53,39 @@ const initScene = () => {
   const showHelper = false
 
   // Meshes
-  addBallMesh()
+  addBall()
 
   // Lights
   addDirectionalLight(0xffb703, 0.1, new Vector3(0, 11, 1.1), scene, showHelper, gui)
   addPointLight(0xffb703, 6.6, 11, new Vector3(3, 6, 5), scene, showHelper, gui)
 }
 
-// TODO promisify
-const addBallMesh = () => {
-  gltfLoader.load('ball.glb', (gltf) => {
-    const uuid = gltf.scene.uuid
-    scene.add(gltf.scene)
-    const ballGroup = scene.children.find((c) => c.uuid === uuid)
-    if (ballGroup) {
-      ball.mesh = ballGroup.children[0]
-      camera?.lookAt(ball.mesh.position)
-      ball.loaded = true
-    }
-  })
+const addBall = async () => {
+  const loadBallMesh = async () =>
+    new Promise<void>((resolve, reject) => {
+      gltfLoader.load(
+        'ball.glb',
+        (gltf) => {
+          const uuid = gltf.scene.uuid
+          scene.add(gltf.scene)
+          const ballGroup = scene.children.find((c) => c.uuid === uuid)
+          if (ballGroup) {
+            ballMesh = ballGroup.children[0]
+            camera?.lookAt(ballMesh.position)
+            resolve()
+          }
+        },
+        undefined,
+        reject
+      )
+    })
+
+  try {
+    await loadBallMesh()
+  } catch (e) {
+    console.error(e)
+  }
+  ballMesh && scene.add(ballMesh)
 }
 
 const start = () => {
