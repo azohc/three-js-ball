@@ -17,7 +17,6 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
 import GUI from 'lil-gui'
-import { addDirectionalLight, addPointLight } from '@/utils/lights'
 import Stats from 'stats.js'
 
 const canvasRef = ref<HTMLCanvasElement>()
