@@ -15,9 +15,19 @@ import {
   Clock,
   QuadraticBezierCurve3,
   SRGBColorSpace,
-  MeshBasicMaterial
+  MeshBasicMaterial,
+  CineonToneMapping,
+  ACESFilmicToneMapping,
+  LinearToneMapping,
+  NoToneMapping,
+  ReinhardToneMapping,
+  Object3D,
+  DataTexture,
+  EquirectangularReflectionMapping
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
+
 import { Scene } from 'three'
 
 import Lenis from '@studio-freight/lenis'
@@ -39,7 +49,7 @@ let pointLightAnimation: gsap.core.Tween | null = null
 const firstAnimationEnd = 0.4
 const firstAnimationProgress = computed(() => Math.min(1, progress.value / firstAnimationEnd))
 
-const secondAnimationEnd = 0.7
+const secondAnimationEnd = 0.8
 const secondAnimationProgress = computed(() => {
   const m = 1 / (secondAnimationEnd - firstAnimationEnd)
   const b = -m * firstAnimationEnd
@@ -57,6 +67,7 @@ let camera: Camera | null = null
 let scene = new Scene()
 let ballMesh: Mesh | null = null
 const gltfLoader = new GLTFLoader()
+const rgbeLoader = new RGBELoader()
 const clock = new Clock()
 const initCameraPosition = new Vector3(0, 15, 10)
 let pointLight: PointLight | null = null
@@ -98,6 +109,7 @@ const init = (canvas: HTMLCanvasElement) => {
 
   renderer.setSize(w, h)
   renderer.outputColorSpace = SRGBColorSpace
+  renderer.toneMapping = CineonToneMapping
 
   const fov = 90
   const aspectRatio = w / h
@@ -120,7 +132,7 @@ const initScene = () => {
   // Lights
   const dl = new DirectionalLight(0xffb703, 0.05)
   dl.position.copy(new Vector3(0, 11, 1.1))
-  scene.add(dl)
+  // scene.add(dl)
   const dlh = new DirectionalLightHelper(dl)
   showHelper && scene.add(dlh)
 
@@ -134,7 +146,7 @@ const initScene = () => {
 
   pointLight = new PointLight(0xffd770, 1, 0, 0.5)
   pointLight.position.copy(new Vector3(0, 11, 1.1))
-  scene.add(pointLight)
+  // scene.add(pointLight)
   const plh = new PointLightHelper(pointLight)
   showHelper && scene.add(plh)
 
@@ -147,12 +159,21 @@ const initScene = () => {
     pointLightFolder.add(pointLight.position, 'y', -10, 10)
     pointLightFolder.add(pointLight.position, 'z', -10, 10)
   }
+
+  rgbeLoader.load('sunrise.hdr', (dataTexture: DataTexture, texData: object) => {
+    console.log(dataTexture, texData)
+
+    dataTexture.mapping = EquirectangularReflectionMapping
+    dataTexture.colorSpace = SRGBColorSpace
+    scene.environment = dataTexture
+    scene.background = dataTexture
+  })
 }
 
 const initAnimation = () => {
   if (camera) {
     const v0 = initCameraPosition
-    const v1 = new Vector3(0, 13, 6)
+    const v1 = new Vector3(0, 12, 6)
     const v2 = new Vector3(0, 2, 1)
 
     const curve = new QuadraticBezierCurve3(v0, v1, v2)
@@ -161,13 +182,13 @@ const initAnimation = () => {
     cameraAnimationOne = gsap.fromTo(camera.position, v0, { ...v2, keyframes })
     cameraAnimationOne.pause()
 
-    cameraAnimationTwo = gsap.fromTo(camera.position, v2, new Vector3(0, 3, 2))
+    cameraAnimationTwo = gsap.fromTo(camera.position, v2, new Vector3(0, 1, 1))
   }
 
   if (pointLight) {
     pointLightAnimation = gsap.fromTo(
       pointLight,
-      { intensity: 0 },
+      { intensity: 0.5 },
       { intensity: 3, ease: Power3.easeIn }
     )
     pointLightAnimation.pause()
@@ -186,10 +207,18 @@ const addBall = async () => {
           if (ballGroup) {
             ballMesh = ballGroup.children[0] as Mesh
 
-            const mat = ballMesh.material as MeshBasicMaterial
-            if (mat.map) {
-              mat.map.colorSpace = SRGBColorSpace
+            const applyColorSpace = (object: Object3D) => {
+              if (object.type === 'Mesh') {
+                const material = (object as Mesh).material as MeshBasicMaterial
+                if (material.map) {
+                  material.map.colorSpace = SRGBColorSpace
+                }
+              }
+              if (object.children && object.children.length > 0) {
+                object.children.forEach(applyColorSpace)
+              }
             }
+            applyColorSpace(ballMesh)
 
             camera?.lookAt(ballMesh.position)
             resolve()
@@ -227,10 +256,11 @@ const loop = (timestamp: number) => {
   if (progress.value < firstAnimationEnd) {
     cameraAnimationOne?.progress(firstAnimationProgress.value)
     pointLightAnimation?.progress(firstAnimationProgress.value)
+    ballMesh && camera?.lookAt(ballMesh.position)
   }
 
   if (progress.value > firstAnimationEnd && progress.value < secondAnimationEnd) {
-    // ballMesh && camera?.lookAt(ballMesh.position)
+    ballMesh && camera?.lookAt(ballMesh.position)
     cameraAnimationTwo?.progress(secondAnimationProgress.value)
   }
 
@@ -241,7 +271,7 @@ const loop = (timestamp: number) => {
 
 const animateBall = (ball: Mesh, delta: number) => {
   const maxSpinSpeed = 7 * delta
-  ball.rotateZ((firstAnimationProgress.value - secondAnimationProgress.value * 0.3) * maxSpinSpeed)
+  ball.rotateZ((firstAnimationProgress.value - secondAnimationProgress.value * 0.88) * maxSpinSpeed)
 }
 
 const initGUI = ({ closed }: { closed: boolean }) => {
@@ -254,6 +284,20 @@ const initGUI = ({ closed }: { closed: boolean }) => {
 
   camera && initCameraGUI(camera)
 
+  const initRendererGUI = (renderer: WebGLRenderer) => {
+    const rendererFolder = gui.addFolder('renderer')
+    rendererFolder.add(renderer, 'toneMapping', {
+      none: NoToneMapping,
+      linear: LinearToneMapping,
+      reinhard: ReinhardToneMapping,
+      cineon: CineonToneMapping,
+      acesfilmic: ACESFilmicToneMapping
+    })
+    rendererFolder.add(renderer, 'toneMappingExposure', 0, 5, 0.1)
+    rendererFolder.add(renderer, 'useLegacyLights')
+  }
+
+  renderer && initRendererGUI(renderer)
   closed && gui.close()
 }
 
