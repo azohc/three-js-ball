@@ -7,7 +7,6 @@ import {
   WebGLRenderer,
   Camera,
   Vector3,
-  Object3D,
   DirectionalLightHelper,
   DirectionalLight,
   PointLight,
@@ -15,8 +14,7 @@ import {
   Mesh,
   Clock,
   QuadraticBezierCurve3,
-  SRGBColorSpace,
-  MeshBasicMaterial
+  SRGBColorSpace
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
