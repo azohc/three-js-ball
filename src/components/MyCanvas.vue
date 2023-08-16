@@ -14,7 +14,9 @@ import {
   PointLightHelper,
   Mesh,
   Clock,
-  QuadraticBezierCurve3
+  QuadraticBezierCurve3,
+  SRGBColorSpace,
+  MeshBasicMaterial
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
@@ -30,16 +32,31 @@ const canvasRef = ref<HTMLCanvasElement>()
 const lenis = new Lenis()
 const animatedScroll = ref(0)
 const progress = ref(0)
-let cameraAnimation: gsap.core.Tween | null = null
+
+let cameraAnimationOne: gsap.core.Tween | null = null
+let cameraAnimationTwo: gsap.core.Tween | null = null
 let pointLightAnimation: gsap.core.Tween | null = null
-const firstAnimationEnd = 0.5
+
+const firstAnimationEnd = 0.4
 const firstAnimationProgress = computed(() => Math.min(1, progress.value / firstAnimationEnd))
+
+const secondAnimationEnd = 0.7
+const secondAnimationProgress = computed(() => {
+  const m = 1 / (secondAnimationEnd - firstAnimationEnd)
+  const b = -m * firstAnimationEnd
+  const mappedValue = m * progress.value + b
+
+  return Math.min(1, Math.max(0, mappedValue))
+})
+
+///// TODOS
+// update FOV to match HTML pixels: in init() an onResize
 
 // THREE
 let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
-let ballMesh: Object3D | null = null
+let ballMesh: Mesh | null = null
 const gltfLoader = new GLTFLoader()
 const clock = new Clock()
 const initCameraPosition = new Vector3(0, 15, 10)
@@ -81,6 +98,7 @@ const init = (canvas: HTMLCanvasElement) => {
     h = window.innerHeight
 
   renderer.setSize(w, h)
+  renderer.outputColorSpace = SRGBColorSpace
 
   const fov = 90
   const aspectRatio = w / h
@@ -136,13 +154,15 @@ const initAnimation = () => {
   if (camera) {
     const v0 = initCameraPosition
     const v1 = new Vector3(0, 13, 6)
-    const v2 = new Vector3(0, 2, 2)
+    const v2 = new Vector3(0, 2, 1)
 
     const curve = new QuadraticBezierCurve3(v0, v1, v2)
     const keyframes = curve.getPoints(50)
 
-    cameraAnimation = gsap.fromTo(camera.position, v0, { ...v2, keyframes })
-    cameraAnimation.pause()
+    cameraAnimationOne = gsap.fromTo(camera.position, v0, { ...v2, keyframes })
+    cameraAnimationOne.pause()
+
+    cameraAnimationTwo = gsap.fromTo(camera.position, v2, new Vector3(0, 3, 2))
   }
 
   if (pointLight) {
@@ -165,7 +185,8 @@ const addBall = async () => {
           scene.add(gltf.scene)
           const ballGroup = scene.children.find((c) => c.uuid === uuid)
           if (ballGroup) {
-            ballMesh = ballGroup.children[0]
+            ballMesh = ballGroup.children[0] as Mesh
+
             camera?.lookAt(ballMesh.position)
             resolve()
           }
@@ -198,9 +219,16 @@ const loop = (timestamp: number) => {
   const dt = clock.getDelta()
 
   ballMesh && animateBall(ballMesh as Mesh, dt)
-  // ballMesh && camera?.lookAt(ballMesh.position)
-  cameraAnimation?.progress(firstAnimationProgress.value)
-  pointLightAnimation?.progress(firstAnimationProgress.value)
+
+  if (progress.value < firstAnimationEnd) {
+    cameraAnimationOne?.progress(firstAnimationProgress.value)
+    pointLightAnimation?.progress(firstAnimationProgress.value)
+  }
+
+  if (progress.value > firstAnimationEnd && progress.value < secondAnimationEnd) {
+    // ballMesh && camera?.lookAt(ballMesh.position)
+    cameraAnimationTwo?.progress(secondAnimationProgress.value)
+  }
 
   renderer && camera && renderer.render(scene, camera)
   stats.end()
@@ -209,7 +237,7 @@ const loop = (timestamp: number) => {
 
 const animateBall = (ball: Mesh, delta: number) => {
   const maxSpinSpeed = 7 * delta
-  ball.rotateZ(firstAnimationProgress.value * maxSpinSpeed)
+  ball.rotateZ((firstAnimationProgress.value - secondAnimationProgress.value * 0.3) * maxSpinSpeed)
 }
 
 const initGUI = ({ closed }: { closed: boolean }) => {

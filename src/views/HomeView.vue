@@ -10,7 +10,7 @@ import Canvas from '@/components/MyCanvas.vue'
 
 <style scoped>
 main {
-  height: 500vh;
+  height: 600vh;
   position: relative;
 }
 </style>
