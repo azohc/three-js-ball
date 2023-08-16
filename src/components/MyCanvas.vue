@@ -14,7 +14,8 @@ import {
   Mesh,
   Clock,
   QuadraticBezierCurve3,
-  SRGBColorSpace
+  SRGBColorSpace,
+  MeshBasicMaterial
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Scene } from 'three'
@@ -184,6 +185,11 @@ const addBall = async () => {
           const ballGroup = scene.children.find((c) => c.uuid === uuid)
           if (ballGroup) {
             ballMesh = ballGroup.children[0] as Mesh
+
+            const mat = ballMesh.material as MeshBasicMaterial
+            if (mat.map) {
+              mat.map.colorSpace = SRGBColorSpace
+            }
 
             camera?.lookAt(ballMesh.position)
             resolve()
