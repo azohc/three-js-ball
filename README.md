@@ -1,52 +1,31 @@
 # three-js-ball
 
-This template should help get you started developing with Vue 3 in Vite.
+hello there, thanks for dropping by. this is a simple vue app i've been playing around with to explore three.js. it's a project from a course over at Harbour.Space University, guided by the digital puppetmaster Robert Borghesi ([@dghez](https://twitter.com/dghez_) on twitter).
 
-## Recommended IDE Setup
+## 🚀 features
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+- vue 3 implementation using typescript and the composition api
+- three.js for 3d rendering
+- dynamic animations using gsap
+- interactive gui for debugging and visualization adjustments with lil-gui
+- performance monitoring with stats.js
 
-## Type Support for `.vue` Imports in TS
+## before we start
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+you'll need [node.js](https://nodejs.org/). i'm using version `v20.1.0` for this project, paired with [yarn](https://yarnpkg.com) as the package manager.
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+## getting things ready
 
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+1. first off, grab the dependencies:
 
-## Customize configuration
-
-See [Vite Configuration Reference](https://vitejs.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
+```bash
+yarn
 ```
 
-### Compile and Hot-Reload for Development
+2. then to spin things up locally, run:
 
-```sh
-npm run dev
+```bash
+yarn dev
 ```
 
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-npm run test:unit
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
+I'd love to see any tweaks or improvements you might have. enjoy tinkering! ✨
