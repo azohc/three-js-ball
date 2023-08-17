@@ -24,14 +24,16 @@ import {
   RepeatWrapping,
   MathUtils,
   PMREMGenerator,
-  FrontSide
+  FrontSide,
+  Scene,
+  Material
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 
-import { Scene } from 'three'
+import { gsap, Power3 } from 'gsap'
 
 import Lenis from '@studio-freight/lenis'
 
@@ -44,21 +46,23 @@ const lenis = new Lenis()
 const animatedScroll = ref(0)
 const progress = ref(0)
 
-let water: Water | null = null
-let sun: Vector3 | null = null
-
 ///// TODOS
-// add antialiasing
 
 // THREE
 let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
-let ballMesh: Mesh | null = null
 let controls: OrbitControls | null = null
+
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
 const clock = new Clock()
+
+let ballMesh: Mesh | null = null
+const ballMeshMaterials: Material[] = []
+
+let water: Water | null = null
+let sun: Vector3 | null = null
 
 // DEBUG
 const gui = new GUI()
@@ -68,7 +72,7 @@ onMounted(async () => {
   const canvas = canvasRef.value
   if (!canvas) return
   init(canvas)
-  await initScene()
+  initScene()
   initGUI({ closed: true })
   initStats()
   requestAnimationFrame(animate)
@@ -97,7 +101,8 @@ const init = (canvas: HTMLCanvasElement) => {
   renderer.setSize(w, h)
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
-  renderer.toneMappingExposure = 0.1
+  renderer.toneMappingExposure = 0
+  renderer.setPixelRatio(window.devicePixelRatio)
 
   const fov = 90
   const aspectRatio = w / h
@@ -117,57 +122,11 @@ const init = (canvas: HTMLCanvasElement) => {
   scene = new Scene()
 }
 
-const initScene = async () => {
+const initScene = () => {
   // Mesh
-  await addBall()
-
-  sun = new Vector3()
-  water = new Water(new PlaneGeometry(10000, 10000), {
-    textureWidth: 512,
-    textureHeight: 512,
-    waterNormals: textureLoader.load('waternormals.jpg', function (texture) {
-      texture.wrapS = texture.wrapT = RepeatWrapping
-    }),
-    sunDirection: new Vector3(),
-    sunColor: 0xffffff,
-    waterColor: 0x001e0f,
-    distortionScale: 3.7,
-    fog: scene.fog !== undefined
-  })
-  water.rotation.x = -Math.PI / 2
-  scene.add(water)
-
-  // Skybox
-  const sky = new Sky()
-  sky.scale.setScalar(10000)
-  scene.add(sky)
-
-  const skyUniforms = sky.material.uniforms
-
-  skyUniforms['turbidity'].value = 10
-  skyUniforms['rayleigh'].value = 2
-  skyUniforms['mieCoefficient'].value = 0.005
-  skyUniforms['mieDirectionalG'].value = 0.8
-
-  const elevation = 0.5
-  const azimuth = 180
-
-  const pmremGenerator = new PMREMGenerator(renderer!)
-  let renderTarget
-
-  const phi = MathUtils.degToRad(90 - elevation)
-  const theta = MathUtils.degToRad(azimuth)
-
-  sun.setFromSphericalCoords(1, phi, theta)
-
-  sky.material.uniforms['sunPosition'].value.copy(sun)
-  water.material.uniforms['sunDirection'].value.copy(sun).normalize()
-
-  const skyScene = new Scene()
-  skyScene.add(sky)
-  renderTarget = pmremGenerator.fromScene(skyScene)
-  scene.environment = renderTarget.texture
-  scene.background = renderTarget.texture
+  addBall()
+  // Environment
+  addEnvironment()
 }
 
 const initGUI = ({ closed }: { closed: boolean }) => {
@@ -196,7 +155,6 @@ const initGUI = ({ closed }: { closed: boolean }) => {
       acesfilmic: ACESFilmicToneMapping
     })
     rendererFolder.add(renderer, 'toneMappingExposure', 0, 5, 0.1)
-    // rendererFolder.add(renderer, 'useLegacyLights')
   }
 
   renderer && initRendererGUI(renderer)
@@ -255,6 +213,9 @@ const addBall = async () => {
                   material.map.colorSpace = SRGBColorSpace
                 }
                 material.side = FrontSide
+                material.transparent = true
+                material.opacity = 0
+                ballMeshMaterials.push(material)
               }
               if (object.children && object.children.length > 0) {
                 object.children.forEach(applyColorSpace)
@@ -273,12 +234,72 @@ const addBall = async () => {
       )
     })
 
-  try {
-    await loadBallMesh()
-  } catch (e) {
-    console.error(e)
-  }
-  ballMesh && scene.add(ballMesh)
+  new Promise((resolve) => {
+    gsap.to(renderer, {
+      toneMappingExposure: 0.22,
+      duration: 3.3,
+      ease: Power3.easeIn,
+      onComplete: resolve
+    })
+  })
+    .then(loadBallMesh)
+    .then(() => scene.add(ballMesh!))
+    .then(() =>
+      ballMeshMaterials.forEach((material) => {
+        gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 3.3 })
+      })
+    )
+    .catch(console.error)
+}
+
+const addEnvironment = () => {
+  sun = new Vector3()
+  water = new Water(new PlaneGeometry(10000, 10000), {
+    textureWidth: 512,
+    textureHeight: 512,
+    waterNormals: textureLoader.load('waternormals.jpg', function (texture) {
+      texture.wrapS = texture.wrapT = RepeatWrapping
+    }),
+    sunDirection: new Vector3(),
+    sunColor: 0xffffff,
+    waterColor: 0x001e0f,
+    distortionScale: 3.7,
+    fog: scene.fog !== undefined
+  })
+  water.rotation.x = -Math.PI / 2
+  scene.add(water)
+
+  // Skybox
+  const sky = new Sky()
+  sky.scale.setScalar(10000)
+  scene.add(sky)
+
+  const skyUniforms = sky.material.uniforms
+
+  skyUniforms['turbidity'].value = 10
+  skyUniforms['rayleigh'].value = 2
+  skyUniforms['mieCoefficient'].value = 0.005
+  skyUniforms['mieDirectionalG'].value = 0.8
+
+  const elevation = 0.5
+  const azimuth = 180
+
+  const pmremGenerator = new PMREMGenerator(renderer!)
+  let renderTarget
+
+  const phi = MathUtils.degToRad(90 - elevation)
+  const theta = MathUtils.degToRad(azimuth)
+
+  sun.setFromSphericalCoords(1, phi, theta)
+
+  sky.material.uniforms['sunPosition'].value.copy(sun)
+  water.material.uniforms['sunDirection'].value.copy(sun).normalize()
+
+  const skyScene = new Scene()
+  skyScene.add(sky)
+  renderTarget = pmremGenerator.fromScene(skyScene)
+  scene.environment = renderTarget.texture
+  scene.background = renderTarget.texture
 }
 </script>
 
