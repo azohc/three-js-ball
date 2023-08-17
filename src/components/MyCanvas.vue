@@ -23,7 +23,8 @@ import {
   TextureLoader,
   RepeatWrapping,
   MathUtils,
-  PMREMGenerator
+  PMREMGenerator,
+  FrontSide
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -47,7 +48,6 @@ let water: Water | null = null
 let sun: Vector3 | null = null
 
 ///// TODOS
-// update FOV to match HTML pixels: in init() an onResize
 // add antialiasing
 
 // THREE
@@ -69,7 +69,6 @@ onMounted(async () => {
   if (!canvas) return
   init(canvas)
   await initScene()
-  initAnimation()
   initGUI({ closed: true })
   initStats()
   requestAnimationFrame(animate)
@@ -88,7 +87,8 @@ useResizeObserver(document.documentElement, () => {
 
 const init = (canvas: HTMLCanvasElement) => {
   renderer = new WebGLRenderer({
-    canvas: canvas
+    canvas: canvas,
+    antialias: true
   })
 
   const w = window.innerWidth,
@@ -97,20 +97,20 @@ const init = (canvas: HTMLCanvasElement) => {
   renderer.setSize(w, h)
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
-  renderer.toneMappingExposure = 0.3
+  renderer.toneMappingExposure = 0.1
 
   const fov = 90
   const aspectRatio = w / h
-  const near = 0.5
+  const near = 0.1
   const far = 1000
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
-  camera.position.set(2, 2, 1)
+  camera.position.set(0, 10, 0)
 
   controls = new OrbitControls(camera, renderer.domElement)
   controls.maxPolarAngle = Math.PI * 0.495
   controls.target.set(0, 1, 0)
-  controls.minDistance = 2.0
+  controls.minDistance = 1.3
   controls.maxDistance = 10.0
   controls.update()
 
@@ -118,7 +118,7 @@ const init = (canvas: HTMLCanvasElement) => {
 }
 
 const initScene = async () => {
-  // Meshes
+  // Mesh
   await addBall()
 
   sun = new Vector3()
@@ -170,8 +170,6 @@ const initScene = async () => {
   scene.background = renderTarget.texture
 }
 
-const initAnimation = () => {}
-
 const initGUI = ({ closed }: { closed: boolean }) => {
   const initCameraGUI = (camera: Camera) => {
     const cameraFolder = gui.addFolder('camera')
@@ -210,6 +208,32 @@ const initStats = () => {
   document.body.appendChild(stats.dom)
 }
 
+// ANIMATION
+const animate = (timestamp: number) => {
+  stats.begin()
+  lenis.raf(timestamp)
+  const dt = clock.getDelta()
+
+  ballMesh && animateBall(ballMesh as Mesh, dt)
+
+  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+
+  renderer && camera && renderer.render(scene, camera)
+  stats.end()
+  requestAnimationFrame(animate)
+}
+
+const animateBall = (ball: Mesh, delta: number) => {
+  const maxSpinSpeed = 7 * delta
+  ball.rotateZ(progress.value * maxSpinSpeed)
+}
+
+// SCROLL
+lenis.on('scroll', (event: any) => {
+  animatedScroll.value = event.animatedScroll
+  progress.value = event.progress
+})
+
 const addBall = async () => {
   const loadBallMesh = async () =>
     new Promise<void>((resolve, reject) => {
@@ -230,6 +254,7 @@ const addBall = async () => {
                   material.map.type = UnsignedByteType
                   material.map.colorSpace = SRGBColorSpace
                 }
+                material.side = FrontSide
               }
               if (object.children && object.children.length > 0) {
                 object.children.forEach(applyColorSpace)
@@ -254,30 +279,6 @@ const addBall = async () => {
     console.error(e)
   }
   ballMesh && scene.add(ballMesh)
-}
-
-lenis.on('scroll', (event: any) => {
-  animatedScroll.value = event.animatedScroll
-  progress.value = event.progress
-})
-
-const animate = (timestamp: number) => {
-  stats.begin()
-  lenis.raf(timestamp)
-  const dt = clock.getDelta()
-
-  ballMesh && animateBall(ballMesh as Mesh, dt)
-
-  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
-
-  renderer && camera && renderer.render(scene, camera)
-  stats.end()
-  requestAnimationFrame(animate)
-}
-
-const animateBall = (ball: Mesh, delta: number) => {
-  const maxSpinSpeed = 7 * delta
-  ball.rotateZ(progress.value * maxSpinSpeed)
 }
 </script>
 
