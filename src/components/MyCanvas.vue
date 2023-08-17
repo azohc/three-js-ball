@@ -27,8 +27,7 @@ import {
   FrontSide,
   Scene,
   Material,
-  QuadraticBezierCurve3,
-  Quaternion
+  CubicBezierCurve3
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
@@ -111,7 +110,7 @@ const init = (canvas: HTMLCanvasElement) => {
   const far = 1000
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
-  camera.position.set(0, 10, 0)
+  camera.position.set(-3, 10, 0)
   camera.lookAt(new Vector3(0, 1, 0))
 
   scene = new Scene()
@@ -205,26 +204,30 @@ const fadeSceneIn = (resolve: () => void) => {
 
 const fadeBallIn = () =>
   ballMeshMaterials.forEach((material) => {
-    gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 3.3 })
+    gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 5 })
   })
 
 const panCameraToBall = () => {
-  const start = new Vector3(0, 10, 0)
-  const end = new Vector3(2, 1, 1)
-  const control = new Vector3((start.x + end.x) / 2, 0, 10)
+  const v0 = new Vector3(-3, 10, 0)
+  // new Vector3(-2, 8, 3),
+  const v1 = new Vector3(-1.5, 5, 5)
+  // new Vector3(0.5, 4.5, 5),
+  const v2 = new Vector3(1, 3.5, 3.5)
+  // new Vector3(2, 3, 2.5),
+  const v3 = new Vector3(1.5, 1, 1)
 
   gsap.to(camera!.position, {
     duration: 10,
     ease: Power3.easeInOut,
     onUpdate: () => camera!.lookAt(ballMesh!.position),
     motionPath: {
-      path: new QuadraticBezierCurve3(start, control, end).getPoints(500)
+      path: new CubicBezierCurve3(v0, v1, v2, v3).getPoints(500)
     }
   })
 }
 
 const bumpLightsUp = () => {
-  gsap.to(renderer, { toneMappingExposure: 0.5, duration: 7, ease: Power3.easeInOut })
+  gsap.to(renderer, { toneMappingExposure: 0.5, duration: 10, ease: Power3.easeIn })
 }
 
 const loadBallMeshPromise = async () =>
