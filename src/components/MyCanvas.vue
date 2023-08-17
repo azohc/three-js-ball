@@ -26,7 +26,7 @@ import {
   PMREMGenerator
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-// import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 
@@ -55,7 +55,7 @@ let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
 let ballMesh: Mesh | null = null
-// let controls: OrbitControls | null = null
+let controls: OrbitControls | null = null
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
 const clock = new Clock()
@@ -64,11 +64,11 @@ const clock = new Clock()
 const gui = new GUI()
 const stats = new Stats()
 
-onMounted(() => {
+onMounted(async () => {
   const canvas = canvasRef.value
   if (!canvas) return
   init(canvas)
-  initScene()
+  await initScene()
   initAnimation()
   initGUI({ closed: true })
   initStats()
@@ -96,7 +96,8 @@ const init = (canvas: HTMLCanvasElement) => {
 
   renderer.setSize(w, h)
   renderer.outputColorSpace = SRGBColorSpace
-  renderer.toneMapping = CineonToneMapping
+  renderer.toneMapping = ACESFilmicToneMapping
+  renderer.toneMappingExposure = 0.3
 
   const fov = 90
   const aspectRatio = w / h
@@ -106,19 +107,19 @@ const init = (canvas: HTMLCanvasElement) => {
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
   camera.position.set(2, 2, 1)
 
-  // controls = new OrbitControls(camera, renderer.domElement)
-  // controls.maxPolarAngle = Math.PI * 0.495
-  // controls.target.set(0, 1, 0)
-  // controls.minDistance = 2.0
-  // controls.maxDistance = 10.0
-  // controls.update()
+  controls = new OrbitControls(camera, renderer.domElement)
+  controls.maxPolarAngle = Math.PI * 0.495
+  controls.target.set(0, 1, 0)
+  controls.minDistance = 2.0
+  controls.maxDistance = 10.0
+  controls.update()
 
   scene = new Scene()
 }
 
-const initScene = () => {
+const initScene = async () => {
   // Meshes
-  addBall()
+  await addBall()
 
   sun = new Vector3()
   water = new Water(new PlaneGeometry(10000, 10000), {
