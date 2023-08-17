@@ -26,14 +26,16 @@ import {
   PMREMGenerator,
   FrontSide,
   Scene,
-  Material
+  Material,
+  QuadraticBezierCurve3,
+  Quaternion
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 
 import { gsap, Power3 } from 'gsap'
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 
 import Lenis from '@studio-freight/lenis'
 
@@ -46,13 +48,12 @@ const lenis = new Lenis()
 const animatedScroll = ref(0)
 const progress = ref(0)
 
-///// TODOS
+gsap.registerPlugin(MotionPathPlugin)
 
 // THREE
 let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
-let controls: OrbitControls | null = null
 
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
@@ -111,13 +112,7 @@ const init = (canvas: HTMLCanvasElement) => {
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
   camera.position.set(0, 10, 0)
-
-  controls = new OrbitControls(camera, renderer.domElement)
-  controls.maxPolarAngle = Math.PI * 0.495
-  controls.target.set(0, 1, 0)
-  controls.minDistance = 1.3
-  controls.maxDistance = 10.0
-  controls.update()
+  camera.lookAt(new Vector3(0, 1, 0))
 
   scene = new Scene()
 }
@@ -132,15 +127,9 @@ const initScene = () => {
 const initGUI = ({ closed }: { closed: boolean }) => {
   const initCameraGUI = (camera: Camera) => {
     const cameraFolder = gui.addFolder('camera')
-    cameraFolder.add(camera.position, 'x', -10, 10).onChange(() => {
-      controls?.update()
-    })
-    cameraFolder.add(camera.position, 'y', -10, 10).onChange(() => {
-      controls?.update()
-    })
-    cameraFolder.add(camera.position, 'z', -10, 10).onChange(() => {
-      controls?.update()
-    })
+    cameraFolder.add(camera.position, 'x', -10, 10),
+      cameraFolder.add(camera.position, 'y', -10, 10),
+      cameraFolder.add(camera.position, 'z', -10, 10)
   }
 
   camera && initCameraGUI(camera)
@@ -172,16 +161,17 @@ const animate = (timestamp: number) => {
   lenis.raf(timestamp)
   const dt = clock.getDelta()
 
-  ballMesh && animateBall(ballMesh as Mesh, dt)
+  ballMesh && spinBallWithScroll(ballMesh as Mesh, dt)
 
-  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+  // if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+  if (water) water.material.uniforms['time'].value += 1.0 / 120.0
 
   renderer && camera && renderer.render(scene, camera)
   stats.end()
   requestAnimationFrame(animate)
 }
 
-const animateBall = (ball: Mesh, delta: number) => {
+const spinBallWithScroll = (ball: Mesh, delta: number) => {
   const maxSpinSpeed = 7 * delta
   ball.rotateZ(progress.value * maxSpinSpeed)
 }
@@ -192,65 +182,88 @@ lenis.on('scroll', (event: any) => {
   progress.value = event.progress
 })
 
-const addBall = async () => {
-  const loadBallMesh = async () =>
-    new Promise<void>((resolve, reject) => {
-      gltfLoader.load(
-        'ball.glb',
-        (gltf) => {
-          const uuid = gltf.scene.uuid
-          scene.add(gltf.scene)
-          const ballGroup = scene.children.find((c) => c.uuid === uuid)
-          if (ballGroup) {
-            ballMesh = ballGroup.children[0] as Mesh
-
-            const applyColorSpace = (object: Object3D) => {
-              if (object.type === 'Mesh') {
-                const material = (object as Mesh).material as MeshBasicMaterial
-                if (material.map) {
-                  material.map.format = RGBAFormat
-                  material.map.type = UnsignedByteType
-                  material.map.colorSpace = SRGBColorSpace
-                }
-                material.side = FrontSide
-                material.transparent = true
-                material.opacity = 0
-                ballMeshMaterials.push(material)
-              }
-              if (object.children && object.children.length > 0) {
-                object.children.forEach(applyColorSpace)
-              }
-            }
-            applyColorSpace(ballMesh)
-
-            ballMesh.position.y = 1
-
-            camera?.lookAt(ballMesh.position)
-            resolve()
-          }
-        },
-        undefined,
-        reject
-      )
-    })
-
-  new Promise((resolve) => {
-    gsap.to(renderer, {
-      toneMappingExposure: 0.22,
-      duration: 3.3,
-      ease: Power3.easeIn,
-      onComplete: resolve
-    })
-  })
-    .then(loadBallMesh)
+const addBall = () => {
+  new Promise<void>(fadeSceneIn)
+    .then(loadBallMeshPromise)
     .then(() => scene.add(ballMesh!))
-    .then(() =>
-      ballMeshMaterials.forEach((material) => {
-        gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 3.3 })
-      })
-    )
+    .then(() => {
+      fadeBallIn()
+      panCameraToBall()
+      bumpLightsUp()
+    })
     .catch(console.error)
 }
+
+const fadeSceneIn = (resolve: () => void) => {
+  gsap.to(renderer, {
+    toneMappingExposure: 0.22,
+    duration: 3.3,
+    ease: Power3.easeIn,
+    onComplete: resolve
+  })
+}
+
+const fadeBallIn = () =>
+  ballMeshMaterials.forEach((material) => {
+    gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 3.3 })
+  })
+
+const panCameraToBall = () => {
+  const start = new Vector3(0, 10, 0)
+  const end = new Vector3(2, 1, 1)
+  const control = new Vector3((start.x + end.x) / 2, 0, 10)
+
+  gsap.to(camera!.position, {
+    duration: 10,
+    ease: Power3.easeInOut,
+    onUpdate: () => camera!.lookAt(ballMesh!.position),
+    motionPath: {
+      path: new QuadraticBezierCurve3(start, control, end).getPoints(500)
+    }
+  })
+}
+
+const bumpLightsUp = () => {
+  gsap.to(renderer, { toneMappingExposure: 0.5, duration: 7, ease: Power3.easeInOut })
+}
+
+const loadBallMeshPromise = async () =>
+  new Promise<void>((resolve, reject) => {
+    gltfLoader.load(
+      'ball.glb',
+      (gltf) => {
+        const uuid = gltf.scene.uuid
+        scene.add(gltf.scene)
+        const ballGroup = scene.children.find((c) => c.uuid === uuid)
+        if (ballGroup) {
+          ballMesh = ballGroup.children[0] as Mesh
+          const applyColorSpace = (object: Object3D) => {
+            if (object.type === 'Mesh') {
+              const material = (object as Mesh).material as MeshBasicMaterial
+              if (material.map) {
+                material.map.format = RGBAFormat
+                material.map.type = UnsignedByteType
+                material.map.colorSpace = SRGBColorSpace
+              }
+              material.side = FrontSide
+              material.transparent = true
+              material.opacity = 0
+              ballMeshMaterials.push(material)
+            }
+            if (object.children && object.children.length > 0) {
+              object.children.forEach(applyColorSpace)
+            }
+          }
+          applyColorSpace(ballMesh)
+          ballMesh.position.y = 1
+          camera?.lookAt(ballMesh.position)
+          resolve()
+        }
+      },
+      undefined,
+      reject
+    )
+  })
 
 const addEnvironment = () => {
   sun = new Vector3()
