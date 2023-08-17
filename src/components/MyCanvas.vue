@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 import {
@@ -7,13 +7,8 @@ import {
   WebGLRenderer,
   Camera,
   Vector3,
-  DirectionalLightHelper,
-  DirectionalLight,
-  PointLight,
-  PointLightHelper,
   Mesh,
   Clock,
-  QuadraticBezierCurve3,
   SRGBColorSpace,
   MeshBasicMaterial,
   CineonToneMapping,
@@ -22,16 +17,22 @@ import {
   NoToneMapping,
   ReinhardToneMapping,
   Object3D,
-  DataTexture,
-  EquirectangularReflectionMapping
+  RGBAFormat,
+  UnsignedByteType,
+  PlaneGeometry,
+  TextureLoader,
+  RepeatWrapping,
+  MathUtils,
+  PMREMGenerator
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
+// import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { Water } from 'three/addons/objects/Water.js'
+import { Sky } from 'three/addons/objects/Sky.js'
 
 import { Scene } from 'three'
 
 import Lenis from '@studio-freight/lenis'
-import gsap, { Power3 } from 'gsap'
 
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
@@ -42,35 +43,22 @@ const lenis = new Lenis()
 const animatedScroll = ref(0)
 const progress = ref(0)
 
-let cameraAnimationOne: gsap.core.Tween | null = null
-let cameraAnimationTwo: gsap.core.Tween | null = null
-let pointLightAnimation: gsap.core.Tween | null = null
-
-const firstAnimationEnd = 0.4
-const firstAnimationProgress = computed(() => Math.min(1, progress.value / firstAnimationEnd))
-
-const secondAnimationEnd = 0.8
-const secondAnimationProgress = computed(() => {
-  const m = 1 / (secondAnimationEnd - firstAnimationEnd)
-  const b = -m * firstAnimationEnd
-  const mappedValue = m * progress.value + b
-
-  return Math.min(1, Math.max(0, mappedValue))
-})
+let water: Water | null = null
+let sun: Vector3 | null = null
 
 ///// TODOS
 // update FOV to match HTML pixels: in init() an onResize
+// add antialiasing
 
 // THREE
 let renderer: WebGLRenderer | null = null
 let camera: Camera | null = null
 let scene = new Scene()
 let ballMesh: Mesh | null = null
+// let controls: OrbitControls | null = null
+const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
-const rgbeLoader = new RGBELoader()
 const clock = new Clock()
-const initCameraPosition = new Vector3(0, 15, 10)
-let pointLight: PointLight | null = null
 
 // DEBUG
 const gui = new GUI()
@@ -84,7 +72,7 @@ onMounted(() => {
   initAnimation()
   initGUI({ closed: true })
   initStats()
-  start()
+  requestAnimationFrame(animate)
 })
 
 useResizeObserver(document.documentElement, () => {
@@ -101,7 +89,6 @@ useResizeObserver(document.documentElement, () => {
 const init = (canvas: HTMLCanvasElement) => {
   renderer = new WebGLRenderer({
     canvas: canvas
-    // alpha: true
   })
 
   const w = window.innerWidth,
@@ -113,86 +100,113 @@ const init = (canvas: HTMLCanvasElement) => {
 
   const fov = 90
   const aspectRatio = w / h
-  const near = 0.01
-  const far = 111
+  const near = 0.5
+  const far = 1000
 
   camera = new PerspectiveCamera(fov, aspectRatio, near, far)
-  camera.position.copy(initCameraPosition)
+  camera.position.set(2, 2, 1)
+
+  // controls = new OrbitControls(camera, renderer.domElement)
+  // controls.maxPolarAngle = Math.PI * 0.495
+  // controls.target.set(0, 1, 0)
+  // controls.minDistance = 2.0
+  // controls.maxDistance = 10.0
+  // controls.update()
 
   scene = new Scene()
 }
 
 const initScene = () => {
-  const showHelper = false
-  const addToGUI = true
-
   // Meshes
   addBall()
 
-  // Lights
-  const dl = new DirectionalLight(0xffb703, 0.05)
-  dl.position.copy(new Vector3(0, 11, 1.1))
-  // scene.add(dl)
-  const dlh = new DirectionalLightHelper(dl)
-  showHelper && scene.add(dlh)
-
-  if (addToGUI) {
-    const directionalLightFolder = gui.addFolder('directional light')
-    directionalLightFolder.add(dl, 'intensity', 0, 0.1, 0.01)
-    directionalLightFolder.add(dl.position, 'x', -10, 10)
-    directionalLightFolder.add(dl.position, 'y', -10, 10)
-    directionalLightFolder.add(dl.position, 'z', -10, 10)
-  }
-
-  pointLight = new PointLight(0xffd770, 1, 0, 0.5)
-  pointLight.position.copy(new Vector3(0, 11, 1.1))
-  // scene.add(pointLight)
-  const plh = new PointLightHelper(pointLight)
-  showHelper && scene.add(plh)
-
-  if (addToGUI) {
-    const pointLightFolder = gui.addFolder('point light')
-    pointLightFolder.add(pointLight, 'intensity', 0, 30, 1)
-    pointLightFolder.add(pointLight, 'distance', 0, 30, 1)
-    pointLightFolder.add(pointLight, 'decay', 0, 2, 0.1)
-    pointLightFolder.add(pointLight.position, 'x', -10, 10)
-    pointLightFolder.add(pointLight.position, 'y', -10, 10)
-    pointLightFolder.add(pointLight.position, 'z', -10, 10)
-  }
-
-  rgbeLoader.load('sunrise.hdr', (dataTexture: DataTexture, texData: object) => {
-    console.log(dataTexture, texData)
-
-    dataTexture.mapping = EquirectangularReflectionMapping
-    dataTexture.colorSpace = SRGBColorSpace
-    scene.environment = dataTexture
-    scene.background = dataTexture
+  sun = new Vector3()
+  water = new Water(new PlaneGeometry(10000, 10000), {
+    textureWidth: 512,
+    textureHeight: 512,
+    waterNormals: textureLoader.load('waternormals.jpg', function (texture) {
+      texture.wrapS = texture.wrapT = RepeatWrapping
+    }),
+    sunDirection: new Vector3(),
+    sunColor: 0xffffff,
+    waterColor: 0x001e0f,
+    distortionScale: 3.7,
+    fog: scene.fog !== undefined
   })
+  water.rotation.x = -Math.PI / 2
+  scene.add(water)
+
+  // Skybox
+  const sky = new Sky()
+  sky.scale.setScalar(10000)
+  scene.add(sky)
+
+  const skyUniforms = sky.material.uniforms
+
+  skyUniforms['turbidity'].value = 10
+  skyUniforms['rayleigh'].value = 2
+  skyUniforms['mieCoefficient'].value = 0.005
+  skyUniforms['mieDirectionalG'].value = 0.8
+
+  const elevation = 0.5
+  const azimuth = 180
+
+  const pmremGenerator = new PMREMGenerator(renderer!)
+  let renderTarget
+
+  const phi = MathUtils.degToRad(90 - elevation)
+  const theta = MathUtils.degToRad(azimuth)
+
+  sun.setFromSphericalCoords(1, phi, theta)
+
+  sky.material.uniforms['sunPosition'].value.copy(sun)
+  water.material.uniforms['sunDirection'].value.copy(sun).normalize()
+
+  const skyScene = new Scene()
+  skyScene.add(sky)
+  renderTarget = pmremGenerator.fromScene(skyScene)
+  scene.environment = renderTarget.texture
+  scene.background = renderTarget.texture
 }
 
-const initAnimation = () => {
-  if (camera) {
-    const v0 = initCameraPosition
-    const v1 = new Vector3(0, 12, 6)
-    const v2 = new Vector3(0, 2, 1)
+const initAnimation = () => {}
 
-    const curve = new QuadraticBezierCurve3(v0, v1, v2)
-    const keyframes = curve.getPoints(50)
-
-    cameraAnimationOne = gsap.fromTo(camera.position, v0, { ...v2, keyframes })
-    cameraAnimationOne.pause()
-
-    cameraAnimationTwo = gsap.fromTo(camera.position, v2, new Vector3(0, 1, 1))
+const initGUI = ({ closed }: { closed: boolean }) => {
+  const initCameraGUI = (camera: Camera) => {
+    const cameraFolder = gui.addFolder('camera')
+    cameraFolder.add(camera.position, 'x', -10, 10).onChange(() => {
+      controls?.update()
+    })
+    cameraFolder.add(camera.position, 'y', -10, 10).onChange(() => {
+      controls?.update()
+    })
+    cameraFolder.add(camera.position, 'z', -10, 10).onChange(() => {
+      controls?.update()
+    })
   }
 
-  if (pointLight) {
-    pointLightAnimation = gsap.fromTo(
-      pointLight,
-      { intensity: 0.5 },
-      { intensity: 3, ease: Power3.easeIn }
-    )
-    pointLightAnimation.pause()
+  camera && initCameraGUI(camera)
+
+  const initRendererGUI = (renderer: WebGLRenderer) => {
+    const rendererFolder = gui.addFolder('renderer')
+    rendererFolder.add(renderer, 'toneMapping', {
+      none: NoToneMapping,
+      linear: LinearToneMapping,
+      reinhard: ReinhardToneMapping,
+      cineon: CineonToneMapping,
+      acesfilmic: ACESFilmicToneMapping
+    })
+    rendererFolder.add(renderer, 'toneMappingExposure', 0, 5, 0.1)
+    // rendererFolder.add(renderer, 'useLegacyLights')
   }
+
+  renderer && initRendererGUI(renderer)
+  closed && gui.close()
+}
+
+const initStats = () => {
+  stats.showPanel(0)
+  document.body.appendChild(stats.dom)
 }
 
 const addBall = async () => {
@@ -211,6 +225,8 @@ const addBall = async () => {
               if (object.type === 'Mesh') {
                 const material = (object as Mesh).material as MeshBasicMaterial
                 if (material.map) {
+                  material.map.format = RGBAFormat
+                  material.map.type = UnsignedByteType
                   material.map.colorSpace = SRGBColorSpace
                 }
               }
@@ -219,6 +235,8 @@ const addBall = async () => {
               }
             }
             applyColorSpace(ballMesh)
+
+            ballMesh.position.y = 1
 
             camera?.lookAt(ballMesh.position)
             resolve()
@@ -242,68 +260,23 @@ lenis.on('scroll', (event: any) => {
   progress.value = event.progress
 })
 
-const start = () => {
-  requestAnimationFrame(loop)
-}
-
-const loop = (timestamp: number) => {
+const animate = (timestamp: number) => {
   stats.begin()
   lenis.raf(timestamp)
   const dt = clock.getDelta()
 
   ballMesh && animateBall(ballMesh as Mesh, dt)
 
-  if (progress.value < firstAnimationEnd) {
-    cameraAnimationOne?.progress(firstAnimationProgress.value)
-    pointLightAnimation?.progress(firstAnimationProgress.value)
-    ballMesh && camera?.lookAt(ballMesh.position)
-  }
-
-  if (progress.value > firstAnimationEnd && progress.value < secondAnimationEnd) {
-    ballMesh && camera?.lookAt(ballMesh.position)
-    cameraAnimationTwo?.progress(secondAnimationProgress.value)
-  }
+  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
 
   renderer && camera && renderer.render(scene, camera)
   stats.end()
-  requestAnimationFrame(loop)
+  requestAnimationFrame(animate)
 }
 
 const animateBall = (ball: Mesh, delta: number) => {
   const maxSpinSpeed = 7 * delta
-  ball.rotateZ((firstAnimationProgress.value - secondAnimationProgress.value * 0.88) * maxSpinSpeed)
-}
-
-const initGUI = ({ closed }: { closed: boolean }) => {
-  const initCameraGUI = (camera: Camera) => {
-    const cameraFolder = gui.addFolder('camera')
-    cameraFolder.add(camera.position, 'x', -10, 10)
-    cameraFolder.add(camera.position, 'y', -10, 10)
-    cameraFolder.add(camera.position, 'z', -10, 10)
-  }
-
-  camera && initCameraGUI(camera)
-
-  const initRendererGUI = (renderer: WebGLRenderer) => {
-    const rendererFolder = gui.addFolder('renderer')
-    rendererFolder.add(renderer, 'toneMapping', {
-      none: NoToneMapping,
-      linear: LinearToneMapping,
-      reinhard: ReinhardToneMapping,
-      cineon: CineonToneMapping,
-      acesfilmic: ACESFilmicToneMapping
-    })
-    rendererFolder.add(renderer, 'toneMappingExposure', 0, 5, 0.1)
-    rendererFolder.add(renderer, 'useLegacyLights')
-  }
-
-  renderer && initRendererGUI(renderer)
-  closed && gui.close()
-}
-
-const initStats = () => {
-  stats.showPanel(0)
-  document.body.appendChild(stats.dom)
+  ball.rotateZ(progress.value * maxSpinSpeed)
 }
 </script>
 
