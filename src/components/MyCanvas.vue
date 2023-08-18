@@ -42,6 +42,12 @@ import GUI from 'lil-gui'
 import Stats from 'stats.js'
 
 const titleOpacity = ref(0)
+const titleBlur = ref(0)
+const titleBrightness = ref(1)
+const titleCS = computed(() => ({
+  opacity: titleOpacity.value,
+  filter: `blur(${titleBlur.value}px) brightness(${titleBrightness.value})`
+}))
 
 const scrollHintOpacity = ref(0)
 const scrollHintTranslateY = ref(0)
@@ -49,6 +55,8 @@ const scrollHintCS = computed(() => ({
   opacity: scrollHintOpacity.value,
   transform: `translateY(${scrollHintTranslateY.value})`
 }))
+
+const firstCameraPanDone = ref(false)
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -194,9 +202,9 @@ lenis.on('scroll', (event: any) => {
     gsap.to(scrollHintOpacity, {
       value: 0,
       ease: Power3.easeOut,
-      duration: 1
+      duration: 2
     })
-  } else if (event.progress === 0) {
+  } else if (firstCameraPanDone.value && event.progress === 0) {
     gsap.to(scrollHintOpacity, {
       value: 1,
       delay: 2.2,
@@ -205,10 +213,11 @@ lenis.on('scroll', (event: any) => {
     })
   }
 
-  console.log(event)
-  // TODO use something from lenis to:
-  // fade the scroll_hint arrows out as soon as the user starts to scroll
-  // fade the title text in a fancy way, TODO think about what the options are for this
+  if (progress.value > 0.1) return
+  titleBlur.value = Math.min(44 * progress.value, 5)
+  titleBrightness.value = Math.max(1 - 4.4 * progress.value, 0.3)
+
+  console.log(event, event.progress, event.velocity)
 })
 
 const addBall = () => {
@@ -250,6 +259,9 @@ const panCameraToBall = () => {
     onUpdate: () => camera!.lookAt(ballMesh!.position),
     motionPath: {
       path: new CubicBezierCurve3(v0, v1, v2, v3).getPoints(500)
+    },
+    onComplete: () => {
+      firstCameraPanDone.value = true
     }
   })
 }
@@ -382,7 +394,7 @@ const addEnvironment = () => {
 <template>
   <div id="title_container">
     <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
-    <h1 id="title" :style="{ opacity: titleOpacity }">ALTINHA</h1>
+    <h1 id="title" :style="titleCS">ALTINHA</h1>
     <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
   </div>
   <canvas id="canvas" ref="canvasRef" />
