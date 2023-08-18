@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 import {
@@ -40,6 +40,15 @@ import Lenis from '@studio-freight/lenis'
 
 import GUI from 'lil-gui'
 import Stats from 'stats.js'
+
+const titleOpacity = ref(0)
+
+const scrollHintOpacity = ref(0)
+const scrollHintTranslateY = ref(0)
+const scrollHintCS = computed(() => ({
+  opacity: scrollHintOpacity.value,
+  transform: `translateY(${scrollHintTranslateY.value})`
+}))
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -162,7 +171,7 @@ const animate = (timestamp: number) => {
 
   // ballMesh && spinBallWithScroll(ballMesh as Mesh, dt)
 
-  // TODO add target maxfps to controls?
+  // TODO add maxfps to controls to target specific framerates?
   if (water) water.material.uniforms['time'].value += 1.0 / 60.0
   // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
 
@@ -180,6 +189,26 @@ const spinBallWithScroll = (ball: Mesh, delta: number) => {
 lenis.on('scroll', (event: any) => {
   animatedScroll.value = event.animatedScroll
   progress.value = event.progress
+
+  if (event.progress > 0) {
+    gsap.to(scrollHintOpacity, {
+      value: 0,
+      ease: Power3.easeOut,
+      duration: 1
+    })
+  } else if (event.progress === 0) {
+    gsap.to(scrollHintOpacity, {
+      value: 1,
+      delay: 2.2,
+      ease: Power3.easeOut,
+      duration: 1
+    })
+  }
+
+  console.log(event)
+  // TODO use something from lenis to:
+  // fade the scroll_hint arrows out as soon as the user starts to scroll
+  // fade the title text in a fancy way, TODO think about what the options are for this
 })
 
 const addBall = () => {
@@ -230,25 +259,25 @@ const bumpLightsUp = () => {
 }
 
 const fadeTitleIn = () => {
-  gsap.to('h1#title', {
-    opacity: 1,
+  gsap.to(titleOpacity, {
+    value: 1,
     ease: Power3.easeIn,
     duration: 5,
     delay: 3,
     onComplete: () => {
-      gsap.to('.scroll_hint', {
-        opacity: 1,
+      gsap.to(scrollHintOpacity, {
+        value: 1,
         ease: Power3.easeInOut,
         duration: 1.1,
         delay: 2.2,
         onComplete: () => {
           gsap.fromTo(
-            '.scroll_hint',
-            { y: 0 },
+            scrollHintTranslateY,
+            { value: '0px' },
             {
-              y: 7,
+              value: '7px',
               yoyoEase: Power2.easeOut,
-              delay: 0.55,
+              delay: 0.22,
               repeatDelay: 0.11,
               duration: 0.55,
               repeat: -1,
@@ -352,9 +381,9 @@ const addEnvironment = () => {
 
 <template>
   <div id="title_container">
-    <span class="scroll_hint">&darr;</span>
-    <h1 id="title">ALTINHA</h1>
-    <span class="scroll_hint">&darr;</span>
+    <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
+    <h1 id="title" :style="{ opacity: titleOpacity }">ALTINHA</h1>
+    <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
   </div>
   <canvas id="canvas" ref="canvasRef" />
 </template>
@@ -369,7 +398,7 @@ div#title_container {
   z-index: 1;
   height: 100vh;
   width: 100%;
-  position: fixed;
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
