@@ -58,10 +58,11 @@ const scrollHintCS = computed(() => ({
 
 const firstCameraPanDone = ref(false)
 
+const targetSpin = ref(0)
+
 const canvasRef = ref<HTMLCanvasElement>()
 
 const lenis = new Lenis()
-const animatedScroll = ref(0)
 const progress = ref(0)
 
 gsap.registerPlugin(MotionPathPlugin)
@@ -175,9 +176,14 @@ const initStats = () => {
 const animate = (timestamp: number) => {
   stats.begin()
   lenis.raf(timestamp)
-  const dt = clock.getDelta()
 
-  // ballMesh && spinBallWithScroll(ballMesh as Mesh, dt)
+  ballMesh && ballMesh.rotateZ(targetSpin.value)
+
+  // TODO animate ball like so:
+  // with each bump of the scroll, we can use lenis' event velocity to tell the direction (velocity is positive or negative float) to gauge inertia
+  // give the ball a spin based on the inertia:
+  // if the velocity is high, then the spin will match the scroll and have some residual spin, which eventually decelerates down to zero spin.
+  // if the velocity is slow, then the spin will match the scroll, i.e. it will have very little residual spin, and it would decelerate to zero spin faster.
 
   // TODO add maxfps to controls to target specific framerates?
   if (water) water.material.uniforms['time'].value += 1.0 / 60.0
@@ -188,14 +194,8 @@ const animate = (timestamp: number) => {
   requestAnimationFrame(animate)
 }
 
-const spinBallWithScroll = (ball: Mesh, delta: number) => {
-  const maxSpinSpeed = 7 * delta
-  ball.rotateZ(progress.value * maxSpinSpeed)
-}
-
 // SCROLL
 lenis.on('scroll', (event: any) => {
-  animatedScroll.value = event.animatedScroll
   progress.value = event.progress
 
   if (event.progress > 0) {
@@ -213,11 +213,15 @@ lenis.on('scroll', (event: any) => {
     })
   }
 
-  if (progress.value > 0.1) return
-  titleBlur.value = Math.min(44 * progress.value, 5)
-  titleBrightness.value = Math.max(1 - 4.4 * progress.value, 0.3)
+  if (progress.value <= 0.1) {
+    titleBlur.value = Math.min(44 * progress.value, 5)
+    titleBrightness.value = Math.max(1 - 4.4 * progress.value, 0.3)
+  }
 
-  console.log(event, event.progress, event.velocity)
+  const SPIN_FACTOR = 0.01
+  targetSpin.value = event.velocity * SPIN_FACTOR
+
+  console.log(event.progress, event.velocity)
 })
 
 const addBall = () => {
