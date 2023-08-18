@@ -33,7 +33,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 
-import { gsap, Power3 } from 'gsap'
+import { gsap, Power2, Power3 } from 'gsap'
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 
 import Lenis from '@studio-freight/lenis'
@@ -160,10 +160,11 @@ const animate = (timestamp: number) => {
   lenis.raf(timestamp)
   const dt = clock.getDelta()
 
-  ballMesh && spinBallWithScroll(ballMesh as Mesh, dt)
+  // ballMesh && spinBallWithScroll(ballMesh as Mesh, dt)
 
-  // if (water) water.material.uniforms['time'].value += 1.0 / 60.0
-  if (water) water.material.uniforms['time'].value += 1.0 / 120.0
+  // TODO add target maxfps to controls?
+  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+  // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
 
   renderer && camera && renderer.render(scene, camera)
   stats.end()
@@ -210,8 +211,8 @@ const fadeBallIn = () =>
 
 const panCameraToBall = () => {
   const v0 = new Vector3(-3, 10, 0)
-  const v1 = new Vector3(-1.5, 5, 5)
-  const v2 = new Vector3(1, 3.5, 3.5)
+  const v1 = new Vector3(-1.5, 7, 5)
+  const v2 = new Vector3(0, 4, 3.5)
   const v3 = new Vector3(1.5, 1, 1)
 
   gsap.to(camera!.position, {
@@ -228,8 +229,37 @@ const bumpLightsUp = () => {
   gsap.to(renderer, { toneMappingExposure: 0.5, duration: 10, ease: Power3.easeIn })
 }
 
-const fadeTitleIn = () =>
-  gsap.to('h1#title', { opacity: 1, ease: Power3.easeIn, duration: 5, delay: 3 })
+const fadeTitleIn = () => {
+  gsap.to('h1#title', {
+    opacity: 1,
+    ease: Power3.easeIn,
+    duration: 5,
+    delay: 3,
+    onComplete: () => {
+      gsap.to('.scroll_hint', {
+        opacity: 1,
+        ease: Power3.easeInOut,
+        duration: 1.1,
+        delay: 2.2,
+        onComplete: () => {
+          gsap.fromTo(
+            '.scroll_hint',
+            { y: 0 },
+            {
+              y: 7,
+              yoyoEase: Power2.easeOut,
+              delay: 0.55,
+              repeatDelay: 0.11,
+              duration: 0.55,
+              repeat: -1,
+              ease: Power3.easeInOut
+            }
+          )
+        }
+      })
+    }
+  })
+}
 
 const loadBallMeshPromise = async () =>
   new Promise<void>((resolve, reject) => {
@@ -321,7 +351,11 @@ const addEnvironment = () => {
 </script>
 
 <template>
-  <h1 id="title">ALTINHA</h1>
+  <div id="title_container">
+    <span class="scroll_hint">&darr;</span>
+    <h1 id="title">ALTINHA</h1>
+    <span class="scroll_hint">&darr;</span>
+  </div>
   <canvas id="canvas" ref="canvasRef" />
 </template>
 
@@ -331,18 +365,30 @@ canvas#canvas {
   top: 0;
 }
 
-h1#title {
+div#title_container {
   z-index: 1;
-  position: fixed;
-  top: 33%;
+  height: 100vh;
   width: 100%;
-  margin-inline: auto;
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+h1#title {
   text-align: center;
   font-size: 6rem;
   font-weight: bold;
   color: #f7cd5d;
-  background-color: transparent;
   will-change: opacity;
+  opacity: 0;
+}
+
+span.scroll_hint {
+  color: #f7cd5d;
+  padding-inline: 2rem;
+  font-size: 2rem;
+  will-change: opacity, transform;
   opacity: 0;
 }
 </style>
