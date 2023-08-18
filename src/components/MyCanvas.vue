@@ -8,7 +8,6 @@ import {
   Camera,
   Vector3,
   Mesh,
-  Clock,
   SRGBColorSpace,
   MeshBasicMaterial,
   CineonToneMapping,
@@ -24,7 +23,6 @@ import {
   RepeatWrapping,
   MathUtils,
   PMREMGenerator,
-  FrontSide,
   Scene,
   Material,
   CubicBezierCurve3
