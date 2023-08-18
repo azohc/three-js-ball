@@ -56,7 +56,7 @@ const scrollHintCS = computed(() => ({
   transform: `translateY(${scrollHintTranslateY.value})`
 }))
 
-const firstCameraPanDone = ref(false)
+let firstCameraPanDone = false
 
 const targetSpin = ref(0)
 
@@ -74,10 +74,10 @@ let scene = new Scene()
 
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
-const clock = new Clock()
 
 let ballMesh: Mesh | null = null
 const ballMeshMaterials: Material[] = []
+const ballPatchMeshes: Mesh[] = []
 
 let water: Water | null = null
 let sun: Vector3 | null = null
@@ -204,7 +204,7 @@ lenis.on('scroll', (event: any) => {
       ease: Power3.easeOut,
       duration: 2
     })
-  } else if (firstCameraPanDone.value && event.progress === 0) {
+  } else if (firstCameraPanDone && event.progress === 0) {
     gsap.to(scrollHintOpacity, {
       value: 1,
       delay: 2.2,
@@ -221,7 +221,17 @@ lenis.on('scroll', (event: any) => {
   const SPIN_FACTOR = 0.01
   targetSpin.value = event.velocity * SPIN_FACTOR
 
-  console.log(event.progress, event.velocity)
+  if (firstCameraPanDone && ballPatchMeshes.length) {
+    ballPatchMeshes.forEach((m) => {
+      const scale = 1 + event.progress * 0.3
+      m.scale.set(scale, scale, scale)
+      ballMesh!.position.y = 1 + event.progress * 2
+      camera!.position.y = 1 + event.progress * 1.1
+      camera!.position.x = 1.5 - event.progress * 0.88
+      camera!.position.z = 1 + event.progress * 0.44
+      camera!.lookAt(ballMesh!.position)
+    })
+  }
 })
 
 const addBall = () => {
@@ -265,7 +275,7 @@ const panCameraToBall = () => {
       path: new CubicBezierCurve3(v0, v1, v2, v3).getPoints(500)
     },
     onComplete: () => {
-      firstCameraPanDone.value = true
+      firstCameraPanDone = true
     }
   })
 }
@@ -324,7 +334,7 @@ const loadBallMeshPromise = async () =>
                 material.map.type = UnsignedByteType
                 material.map.colorSpace = SRGBColorSpace
               }
-              material.side = FrontSide
+              // material.side = FrontSide
               material.transparent = true
               material.opacity = 0
               ballMeshMaterials.push(material)
@@ -334,6 +344,11 @@ const loadBallMeshPromise = async () =>
             }
           }
           applyColorSpace(ballMesh)
+
+          ballMesh.children[0].children.forEach(
+            (o3d, i) => i > 0 && ballPatchMeshes.push(o3d as Mesh)
+          )
+
           ballMesh.position.y = 1
           camera?.lookAt(ballMesh.position)
           resolve()
