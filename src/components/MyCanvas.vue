@@ -189,6 +189,7 @@ const addBall = () => {
       fadeBallIn()
       panCameraToBall()
       bumpLightsUp()
+      fadeTitleIn()
     })
     .catch(console.error)
 }
@@ -209,11 +210,8 @@ const fadeBallIn = () =>
 
 const panCameraToBall = () => {
   const v0 = new Vector3(-3, 10, 0)
-  // new Vector3(-2, 8, 3),
   const v1 = new Vector3(-1.5, 5, 5)
-  // new Vector3(0.5, 4.5, 5),
   const v2 = new Vector3(1, 3.5, 3.5)
-  // new Vector3(2, 3, 2.5),
   const v3 = new Vector3(1.5, 1, 1)
 
   gsap.to(camera!.position, {
@@ -229,6 +227,9 @@ const panCameraToBall = () => {
 const bumpLightsUp = () => {
   gsap.to(renderer, { toneMappingExposure: 0.5, duration: 10, ease: Power3.easeIn })
 }
+
+const fadeTitleIn = () =>
+  gsap.to('h1#title', { opacity: 1, ease: Power3.easeIn, duration: 5, delay: 3 })
 
 const loadBallMeshPromise = async () =>
   new Promise<void>((resolve, reject) => {
@@ -277,7 +278,7 @@ const addEnvironment = () => {
       texture.wrapS = texture.wrapT = RepeatWrapping
     }),
     sunDirection: new Vector3(),
-    sunColor: 0xffffff,
+    sunColor: 0xf7cd5d,
     waterColor: 0x001e0f,
     distortionScale: 3.7,
     fog: scene.fog !== undefined
@@ -320,11 +321,28 @@ const addEnvironment = () => {
 </script>
 
 <template>
+  <h1 id="title">ALTINHA</h1>
   <canvas id="canvas" ref="canvasRef" />
 </template>
 
 <style scoped>
 canvas#canvas {
   position: fixed;
+  top: 0;
+}
+
+h1#title {
+  z-index: 1;
+  position: fixed;
+  top: 33%;
+  width: 100%;
+  margin-inline: auto;
+  text-align: center;
+  font-size: 6rem;
+  font-weight: bold;
+  color: #f7cd5d;
+  background-color: transparent;
+  will-change: opacity;
+  opacity: 0;
 }
 </style>
