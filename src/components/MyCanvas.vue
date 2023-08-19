@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 import {
@@ -10,11 +10,7 @@ import {
   Mesh,
   SRGBColorSpace,
   MeshBasicMaterial,
-  CineonToneMapping,
   ACESFilmicToneMapping,
-  LinearToneMapping,
-  NoToneMapping,
-  ReinhardToneMapping,
   Object3D,
   RGBAFormat,
   UnsignedByteType,
@@ -36,8 +32,7 @@ import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 
 import Lenis from '@studio-freight/lenis'
 
-import GUI from 'lil-gui'
-import Stats from 'stats.js'
+import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
 
 const titleOpacity = ref(0)
 const titleBlur = ref(0)
@@ -80,18 +75,19 @@ const ballPatchMeshes: Mesh[] = []
 let water: Water | null = null
 let sun: Vector3 | null = null
 
-// DEBUG
-const gui = new GUI()
-const stats = new Stats()
-
-onMounted(async () => {
+onMounted(() => {
   const canvas = canvasRef.value
   if (!canvas) return
   init(canvas)
   initScene()
-  initGUI({ closed: true })
+  initGUI(camera!, renderer!, { closed: true })
   initStats()
+
   requestAnimationFrame(animate)
+})
+
+onUnmounted(() => {
+  destroyDebugTools()
 })
 
 useResizeObserver(document.documentElement, () => {
@@ -139,40 +135,9 @@ const initScene = () => {
   addEnvironment()
 }
 
-const initGUI = ({ closed }: { closed: boolean }) => {
-  const initCameraGUI = (camera: Camera) => {
-    const cameraFolder = gui.addFolder('camera')
-    cameraFolder.add(camera.position, 'x', -10, 10),
-      cameraFolder.add(camera.position, 'y', -10, 10),
-      cameraFolder.add(camera.position, 'z', -10, 10)
-  }
-
-  camera && initCameraGUI(camera)
-
-  const initRendererGUI = (renderer: WebGLRenderer) => {
-    const rendererFolder = gui.addFolder('renderer')
-    rendererFolder.add(renderer, 'toneMapping', {
-      none: NoToneMapping,
-      linear: LinearToneMapping,
-      reinhard: ReinhardToneMapping,
-      cineon: CineonToneMapping,
-      acesfilmic: ACESFilmicToneMapping
-    })
-    rendererFolder.add(renderer, 'toneMappingExposure', 0, 5, 0.1)
-  }
-
-  renderer && initRendererGUI(renderer)
-  closed && gui.close()
-}
-
-const initStats = () => {
-  stats.showPanel(0)
-  document.body.appendChild(stats.dom)
-}
-
 // ANIMATION
 const animate = (timestamp: number) => {
-  stats.begin()
+  beginStats()
   lenis.raf(timestamp)
 
   ballMesh && ballMesh.rotateZ(targetSpin.value)
@@ -182,7 +147,7 @@ const animate = (timestamp: number) => {
   // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
 
   renderer && camera && renderer.render(scene, camera)
-  stats.end()
+  endStats()
   requestAnimationFrame(animate)
 }
 
@@ -312,7 +277,7 @@ const fadeTitleIn = () => {
 const loadBallMeshPromise = async () =>
   new Promise<void>((resolve, reject) => {
     gltfLoader.load(
-      'ball.glb',
+      'ball_optimized.glb',
       (gltf) => {
         const uuid = gltf.scene.uuid
         scene.add(gltf.scene)
