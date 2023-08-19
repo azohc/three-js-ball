@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 import {
   PerspectiveCamera,
   WebGLRenderer,
-  Camera,
   Vector3,
   Mesh,
   SRGBColorSpace,
@@ -20,43 +19,39 @@ import {
   MathUtils,
   PMREMGenerator,
   Scene,
-  Material,
-  CubicBezierCurve3
+  Material
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 
-import { gsap, Power2, Power3 } from 'gsap'
-import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
+import { gsap, Power3 } from 'gsap'
 
 import Lenis from '@studio-freight/lenis'
 
 import TitleComponent from './TitleComponent.vue'
-import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
-import { onBeforeRouteLeave } from 'vue-router'
-
-const titleOpacity = ref(0)
-const titleBlur = ref(0)
-const titleBrightness = ref(1)
-
-const scrollHintOpacity = ref(0)
-const scrollHintTranslateY = ref(0)
+import { destroyDebugTools, initGUI, initStats } from '@/lib/debugUtils'
+import {
+  animate,
+  fadeSceneIn,
+  fadeBallIn,
+  panCameraToBall,
+  bumpLightsUp,
+  fadeTitleIn
+} from '@/lib/animation'
+import { useAnimationStore } from '@/stores/animation'
 
 let firstCameraPanDone = false
-
-const targetSpin = ref(0)
 
 const canvasRef = ref<HTMLCanvasElement>()
 
 const lenis = new Lenis()
-const progress = ref(0)
 
-gsap.registerPlugin(MotionPathPlugin)
+const animated = useAnimationStore()
 
 // THREE
 let renderer: WebGLRenderer | null = null
-let camera: Camera | null = null
+let camera: PerspectiveCamera | null = null
 let scene = new Scene()
 
 const textureLoader = new TextureLoader()
@@ -69,16 +64,17 @@ const ballPatchMeshes: Mesh[] = []
 let water: Water | null = null
 let sun: Vector3 | null = null
 
-onMounted(() => {
+onMounted(async () => {
   const canvas = canvasRef.value
   if (!canvas) return
 
   init(canvas)
-  initScene()
+  await initScene()
   initGUI(camera!, renderer!, { closed: true })
   initStats()
 
-  requestAnimationFrame(animate)
+  triggerAnimation()
+  requestAnimationFrame(() => animate(renderer!, scene, camera!, ballMesh!, water!, lenis))
 })
 
 onUnmounted(() => {
@@ -90,9 +86,8 @@ useResizeObserver(document.documentElement, () => {
   const h = window.innerHeight
   const aspectRatio = w / h
 
-  const pcamera = camera as PerspectiveCamera
-  pcamera.aspect = aspectRatio
-  pcamera.updateProjectionMatrix()
+  camera!.aspect = aspectRatio
+  camera!.updateProjectionMatrix()
   renderer && renderer.setSize(w, h)
 })
 
@@ -123,55 +118,35 @@ const init = (canvas: HTMLCanvasElement) => {
   scene = new Scene()
 }
 
-const initScene = () => {
-  // Mesh
-  addBall()
-  // Environment
+const initScene = async () => {
   addEnvironment()
-}
-
-// ANIMATION
-const animate = (timestamp: number) => {
-  beginStats()
-  lenis.raf(timestamp)
-
-  ballMesh && ballMesh.rotateZ(targetSpin.value)
-
-  // TODO add maxfps to controls to target specific framerates?
-  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
-  // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
-
-  renderer && camera && renderer.render(scene, camera)
-  endStats()
-  requestAnimationFrame(animate)
+  await addBall()
 }
 
 // SCROLL
 lenis.on('scroll', (event: any) => {
-  progress.value = event.progress
-
   if (event.progress > 0) {
-    gsap.to(scrollHintOpacity, {
-      value: 0,
+    gsap.to(animated, {
+      scrollHintOpacity: 0,
       ease: Power3.easeOut,
       duration: 2
     })
   } else if (firstCameraPanDone && event.progress === 0) {
-    gsap.to(scrollHintOpacity, {
-      value: 1,
+    gsap.to(animated, {
+      scrollHintOpacity: 1,
       delay: 2.2,
       ease: Power3.easeOut,
       duration: 1
     })
   }
 
-  if (progress.value <= 0.1) {
-    titleBlur.value = Math.min(44 * progress.value, 5)
-    titleBrightness.value = Math.max(1 - 4.4 * progress.value, 0.3)
+  if (event.progress <= 0.1) {
+    animated.titleBlur = Math.min(44 * event.progress, 5)
+    animated.titleBrightness = Math.max(1 - 4.4 * event.progress, 0.3)
   }
 
   const SPIN_FACTOR = 0.01
-  targetSpin.value = event.velocity * SPIN_FACTOR
+  animated.targetBallSpin = event.velocity * SPIN_FACTOR
 
   if (firstCameraPanDone && ballPatchMeshes.length) {
     ballPatchMeshes.forEach((m) => {
@@ -186,92 +161,27 @@ lenis.on('scroll', (event: any) => {
   }
 })
 
-const addBall = () => {
-  new Promise<void>(fadeSceneIn)
-    .then(loadBallMeshPromise)
-    .then(() => scene.add(ballMesh!))
-    .then(() => {
-      fadeBallIn()
-      panCameraToBall()
-      bumpLightsUp()
-      fadeTitleIn()
-    })
-    .catch(console.error)
+const addBall = async () => {
+  try {
+    await loadBallMeshPromise()
+    scene.add(ballMesh!)
+  } catch (error) {
+    console.error(error)
+  }
 }
 
-const fadeSceneIn = (resolve: () => void) => {
-  gsap.to(renderer, {
-    toneMappingExposure: 0.22,
-    duration: 3.3,
-    ease: Power3.easeIn,
-    onComplete: resolve
+const triggerAnimation = async () => {
+  fadeSceneIn(renderer!)
+
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+  fadeBallIn(ballMeshMaterials)
+
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+  panCameraToBall(camera!, ballMesh!, () => {
+    firstCameraPanDone = true
   })
-}
-
-const fadeBallIn = () => {
-  ballMeshMaterials.forEach((material) => {
-    gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 5 })
-  })
-}
-
-const panCameraToBall = () => {
-  const v0 = new Vector3(-3, 10, 0)
-  const v1 = new Vector3(-1.5, 7, 5)
-  const v2 = new Vector3(0, 4, 3.5)
-  const v3 = new Vector3(1.5, 1, 1)
-
-  gsap.to(camera!.position, {
-    duration: 10,
-    ease: Power3.easeInOut,
-    onUpdate: () => camera!.lookAt(ballMesh!.position),
-    motionPath: {
-      path: new CubicBezierCurve3(v0, v1, v2, v3).getPoints(500)
-    },
-    onComplete: () => {
-      firstCameraPanDone = true
-    }
-  })
-}
-
-const bumpLightsUp = () => {
-  gsap.to(renderer, { toneMappingExposure: 0.5, duration: 10, ease: Power3.easeIn })
-}
-
-const fadeTitleIn = () => {
-  gsap.to(titleOpacity, {
-    value: 1,
-    ease: Power3.easeIn,
-    duration: 5,
-    delay: 3,
-    onStart: () => lenis.scrollTo(0),
-    onComplete: () => {
-      lenis.progress === 0 && fadeScrollHintsIn()
-    }
-  })
-}
-
-const fadeScrollHintsIn = () => {
-  gsap.to(scrollHintOpacity, {
-    value: 1,
-    ease: Power3.easeInOut,
-    duration: 1.1,
-    delay: 2.2,
-    onComplete: () => {
-      gsap.fromTo(
-        scrollHintTranslateY,
-        { value: '0px' },
-        {
-          value: '7px',
-          yoyoEase: Power2.easeOut,
-          delay: 0.22,
-          repeatDelay: 0.11,
-          duration: 0.55,
-          repeat: -1,
-          ease: Power3.easeInOut
-        }
-      )
-    }
-  })
+  bumpLightsUp(renderer!)
+  fadeTitleIn(lenis)
 }
 
 const loadBallMeshPromise = async () =>
@@ -368,13 +278,7 @@ const addEnvironment = () => {
 </script>
 
 <template>
-  <TitleComponent
-    :titleOpacity="titleOpacity"
-    :titleBlur="titleBlur"
-    :titleBrightness="titleBrightness"
-    :scrollHintOpacity="scrollHintOpacity"
-    :scrollHintTranslateY="scrollHintTranslateY"
-  />
+  <TitleComponent />
 
   <canvas id="canvas" ref="canvasRef" />
 </template>

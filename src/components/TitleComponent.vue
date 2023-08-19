@@ -1,22 +1,17 @@
 <script setup lang="ts">
+import { useAnimationStore } from '@/stores/animation'
 import { computed } from 'vue'
 
-const props = defineProps<{
-  titleOpacity: number
-  titleBlur: number
-  titleBrightness: number
-  scrollHintOpacity: number
-  scrollHintTranslateY: number
-}>()
+const animated = useAnimationStore()
 
 const titleCS = computed(() => ({
-  opacity: props.titleOpacity,
-  filter: `blur(${props.titleBlur}px) brightness(${props.titleBrightness})`
+  opacity: animated.titleOpacity,
+  filter: `blur(${animated.titleBlur}px) brightness(${animated.titleBrightness})`
 }))
 
 const scrollHintCS = computed(() => ({
-  opacity: props.scrollHintOpacity,
-  transform: `translateY(${props.scrollHintTranslateY})`
+  opacity: animated.scrollHintOpacity,
+  transform: `translateY(${animated.scrollHintTranslateY})`
 }))
 </script>
 
