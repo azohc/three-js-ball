@@ -177,12 +177,6 @@ const animate = (timestamp: number) => {
 
   ballMesh && ballMesh.rotateZ(targetSpin.value)
 
-  // TODO animate ball like so:
-  // with each bump of the scroll, we can use lenis' event velocity to tell the direction (velocity is positive or negative float) to gauge inertia
-  // give the ball a spin based on the inertia:
-  // if the velocity is high, then the spin will match the scroll and have some residual spin, which eventually decelerates down to zero spin.
-  // if the velocity is slow, then the spin will match the scroll, i.e. it will have very little residual spin, and it would decelerate to zero spin faster.
-
   // TODO add maxfps to controls to target specific framerates?
   if (water) water.material.uniforms['time'].value += 1.0 / 60.0
   // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
@@ -254,10 +248,11 @@ const fadeSceneIn = (resolve: () => void) => {
   })
 }
 
-const fadeBallIn = () =>
+const fadeBallIn = () => {
   ballMeshMaterials.forEach((material) => {
     gsap.to(material, { opacity: 1, ease: Power3.easeIn, duration: 5 })
   })
+}
 
 const panCameraToBall = () => {
   const v0 = new Vector3(-3, 10, 0)
@@ -351,6 +346,7 @@ const loadBallMeshPromise = async () =>
           camera?.lookAt(ballMesh.position)
           resolve()
         }
+        console.log('2b. onLoad callback end')
       },
       undefined,
       reject
@@ -390,7 +386,6 @@ const addEnvironment = () => {
   const azimuth = 180
 
   const pmremGenerator = new PMREMGenerator(renderer!)
-  let renderTarget
 
   const phi = MathUtils.degToRad(90 - elevation)
   const theta = MathUtils.degToRad(azimuth)
@@ -402,7 +397,7 @@ const addEnvironment = () => {
 
   const skyScene = new Scene()
   skyScene.add(sky)
-  renderTarget = pmremGenerator.fromScene(skyScene)
+  const renderTarget = pmremGenerator.fromScene(skyScene)
   scene.environment = renderTarget.texture
   scene.background = renderTarget.texture
 }
