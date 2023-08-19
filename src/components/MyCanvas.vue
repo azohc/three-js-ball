@@ -187,6 +187,13 @@ const triggerAnimation = async () => {
 const loadBallMeshPromise = async () =>
   new Promise<void>((resolve, reject) => {
     gltfLoader.load(
+      /**
+       * ball model optimized with gltf.report's simple_pipeline.js script:
+       *  -> remove duplicate vertex or texture data, if any.
+       *  -> losslessly resample animation frames.
+       *  -> remove unused nodes, textures, or other data.
+       *  -> resize all textures to ≤2k.
+       */
       'ball_optimized.glb',
       (gltf) => {
         const uuid = gltf.scene.uuid
