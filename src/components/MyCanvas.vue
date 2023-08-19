@@ -19,13 +19,12 @@ import {
   MathUtils,
   PMREMGenerator,
   Scene,
-  Material
+  Material,
+  PointLight
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
 import { Sky } from 'three/addons/objects/Sky.js'
-
-import { gsap, Power3 } from 'gsap'
 
 import Lenis from '@studio-freight/lenis'
 
@@ -37,7 +36,14 @@ import {
   fadeBallIn,
   panCameraToBall,
   bumpLightsUp,
-  fadeTitleIn
+  fadeTitleIn,
+  initScrollHintTween,
+  fadeScrollHintsIn,
+  fadeScrollHintsOut,
+  syncPatchDetach,
+  syncBallElevationWithCamera,
+  initCoreLightIntensityTween,
+  syncCoreLight
 } from '@/lib/animation'
 import { useAnimationStore } from '@/stores/animation'
 
@@ -59,10 +65,12 @@ const gltfLoader = new GLTFLoader()
 
 let ballMesh: Mesh | null = null
 const ballMeshMaterials: Material[] = []
-const ballPatchMeshes: Mesh[] = []
+const detachablePatchMeshes: Mesh[] = []
 
 let water: Water | null = null
 let sun: Vector3 | null = null
+
+let coreLight: PointLight | null = null
 
 onMounted(async () => {
   const canvas = canvasRef.value
@@ -70,10 +78,12 @@ onMounted(async () => {
 
   init(canvas)
   await initScene()
+  initAnimations()
+
   initGUI(camera!, renderer!, { closed: true })
   initStats()
 
-  triggerAnimation()
+  triggerAnimations()
   requestAnimationFrame(() => animate(renderer!, scene, camera!, ballMesh!, water!, lenis))
 })
 
@@ -120,46 +130,39 @@ const init = (canvas: HTMLCanvasElement) => {
 
 const initScene = async () => {
   addEnvironment()
+  addCoreLight()
   await addBall()
 }
 
 // SCROLL
 lenis.on('scroll', (event: any) => {
-  if (event.progress > 0) {
-    gsap.to(animated, {
-      scrollHintOpacity: 0,
-      ease: Power3.easeOut,
-      duration: 2
-    })
-  } else if (firstCameraPanDone && event.progress === 0) {
-    gsap.to(animated, {
-      scrollHintOpacity: 1,
-      delay: 2.2,
-      ease: Power3.easeOut,
-      duration: 1
-    })
+  const { progress: scrollProgress } = event
+  if (scrollProgress > 0) {
+    fadeScrollHintsOut()
+  } else if (firstCameraPanDone && scrollProgress === 0) {
+    fadeScrollHintsIn()
   }
 
-  if (event.progress <= 0.1) {
-    animated.titleBlur = Math.min(44 * event.progress, 5)
-    animated.titleBrightness = Math.max(1 - 4.4 * event.progress, 0.3)
+  if (scrollProgress <= 0.1) {
+    animated.titleBlur = Math.min(44 * scrollProgress, 5)
+    animated.titleBrightness = Math.max(1 - 4.4 * scrollProgress, 0.3)
   }
 
   const SPIN_FACTOR = 0.01
   animated.targetBallSpin = event.velocity * SPIN_FACTOR
 
-  if (firstCameraPanDone && ballPatchMeshes.length) {
-    ballPatchMeshes.forEach((m) => {
-      const scale = 1 + event.progress * 0.3
-      m.scale.set(scale, scale, scale)
-      ballMesh!.position.y = 1 + event.progress * 2
-      camera!.position.y = 1 + event.progress * 1.1
-      camera!.position.x = 1.5 - event.progress * 0.88
-      camera!.position.z = 1 + event.progress * 0.44
-      camera!.lookAt(ballMesh!.position)
-    })
+  if (firstCameraPanDone && detachablePatchMeshes.length) {
+    syncPatchDetach(detachablePatchMeshes, scrollProgress)
+    syncBallElevationWithCamera(ballMesh!, camera!, scrollProgress)
+    syncCoreLight(coreLight!, ballMesh!, scrollProgress)
   }
 })
+
+const addCoreLight = () => {
+  coreLight = new PointLight(0xb9973f, 0, 0, 10)
+  coreLight.castShadow = true
+  scene.add(coreLight)
+}
 
 const addBall = async () => {
   try {
@@ -170,7 +173,14 @@ const addBall = async () => {
   }
 }
 
-const triggerAnimation = async () => {
+const initAnimations = () => {
+  initCoreLightIntensityTween(coreLight!)
+  initScrollHintTween()
+}
+
+const triggerAnimations = async () => {
+  lenis.scrollTo(0)
+  lenis.isLocked = true
   fadeSceneIn(renderer!)
 
   await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -179,9 +189,12 @@ const triggerAnimation = async () => {
   await new Promise((resolve) => setTimeout(resolve, 1000))
   panCameraToBall(camera!, ballMesh!, () => {
     firstCameraPanDone = true
+    lenis.isLocked = false
   })
   bumpLightsUp(renderer!)
-  fadeTitleIn(lenis)
+  fadeTitleIn(() => {
+    lenis.progress === 0 && fadeScrollHintsIn()
+  })
 }
 
 const loadBallMeshPromise = async () =>
@@ -209,7 +222,6 @@ const loadBallMeshPromise = async () =>
                 material.map.type = UnsignedByteType
                 material.map.colorSpace = SRGBColorSpace
               }
-              // material.side = FrontSide
               material.transparent = true
               material.opacity = 0
               ballMeshMaterials.push(material)
@@ -221,7 +233,7 @@ const loadBallMeshPromise = async () =>
           applyColorSpace(ballMesh)
 
           ballMesh.children[0].children.forEach(
-            (o3d, i) => i > 0 && ballPatchMeshes.push(o3d as Mesh)
+            (o3d, i) => i > 0 && detachablePatchMeshes.push(o3d as Mesh)
           )
 
           ballMesh.position.y = 1
