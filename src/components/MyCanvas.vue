@@ -32,22 +32,16 @@ import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 
 import Lenis from '@studio-freight/lenis'
 
+import TitleComponent from './TitleComponent.vue'
 import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
+import { onBeforeRouteLeave } from 'vue-router'
 
 const titleOpacity = ref(0)
 const titleBlur = ref(0)
 const titleBrightness = ref(1)
-const titleCS = computed(() => ({
-  opacity: titleOpacity.value,
-  filter: `blur(${titleBlur.value}px) brightness(${titleBrightness.value})`
-}))
 
 const scrollHintOpacity = ref(0)
 const scrollHintTranslateY = ref(0)
-const scrollHintCS = computed(() => ({
-  opacity: scrollHintOpacity.value,
-  transform: `translateY(${scrollHintTranslateY.value})`
-}))
 
 let firstCameraPanDone = false
 
@@ -78,6 +72,7 @@ let sun: Vector3 | null = null
 onMounted(() => {
   const canvas = canvasRef.value
   if (!canvas) return
+
   init(canvas)
   initScene()
   initGUI(camera!, renderer!, { closed: true })
@@ -248,28 +243,33 @@ const fadeTitleIn = () => {
     ease: Power3.easeIn,
     duration: 5,
     delay: 3,
+    onStart: () => lenis.scrollTo(0),
     onComplete: () => {
-      gsap.to(scrollHintOpacity, {
-        value: 1,
-        ease: Power3.easeInOut,
-        duration: 1.1,
-        delay: 2.2,
-        onComplete: () => {
-          gsap.fromTo(
-            scrollHintTranslateY,
-            { value: '0px' },
-            {
-              value: '7px',
-              yoyoEase: Power2.easeOut,
-              delay: 0.22,
-              repeatDelay: 0.11,
-              duration: 0.55,
-              repeat: -1,
-              ease: Power3.easeInOut
-            }
-          )
+      lenis.progress === 0 && fadeScrollHintsIn()
+    }
+  })
+}
+
+const fadeScrollHintsIn = () => {
+  gsap.to(scrollHintOpacity, {
+    value: 1,
+    ease: Power3.easeInOut,
+    duration: 1.1,
+    delay: 2.2,
+    onComplete: () => {
+      gsap.fromTo(
+        scrollHintTranslateY,
+        { value: '0px' },
+        {
+          value: '7px',
+          yoyoEase: Power2.easeOut,
+          delay: 0.22,
+          repeatDelay: 0.11,
+          duration: 0.55,
+          repeat: -1,
+          ease: Power3.easeInOut
         }
-      })
+      )
     }
   })
 }
@@ -311,7 +311,6 @@ const loadBallMeshPromise = async () =>
           camera?.lookAt(ballMesh.position)
           resolve()
         }
-        console.log('2b. onLoad callback end')
       },
       undefined,
       reject
@@ -369,11 +368,14 @@ const addEnvironment = () => {
 </script>
 
 <template>
-  <div id="title_container">
-    <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
-    <h1 id="title" :style="titleCS">ALTINHA</h1>
-    <span class="scroll_hint" :style="scrollHintCS">&darr;</span>
-  </div>
+  <TitleComponent
+    :titleOpacity="titleOpacity"
+    :titleBlur="titleBlur"
+    :titleBrightness="titleBrightness"
+    :scrollHintOpacity="scrollHintOpacity"
+    :scrollHintTranslateY="scrollHintTranslateY"
+  />
+
   <canvas id="canvas" ref="canvasRef" />
 </template>
 
@@ -381,32 +383,5 @@ const addEnvironment = () => {
 canvas#canvas {
   position: fixed;
   top: 0;
-}
-
-div#title_container {
-  z-index: 1;
-  height: 100vh;
-  width: 100%;
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-h1#title {
-  text-align: center;
-  font-size: 6rem;
-  font-weight: bold;
-  color: #f7cd5d;
-  will-change: opacity;
-  opacity: 0;
-}
-
-span.scroll_hint {
-  color: #f7cd5d;
-  padding-inline: 2rem;
-  font-size: 2rem;
-  will-change: opacity, transform;
-  opacity: 0;
 }
 </style>
