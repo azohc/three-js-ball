@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
-
 import {
   PerspectiveCamera,
   WebGLRenderer,
@@ -10,36 +9,25 @@ import {
   ACESFilmicToneMapping,
   Scene,
   PointLight,
-  Raycaster,
-  Vector2
+  Raycaster
 } from 'three'
 import { Water } from 'three/addons/objects/Water.js'
-
 import Lenis from '@studio-freight/lenis'
-
-import TitleComponent from './TitleComponent.vue'
-import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
-import { useAnimationStore } from '@/stores/animation'
-import { syncBallElevationWithCamera, panCameraToBall } from '@/lib/cameraAnimations'
+import { initBall, initEnvironment, initCoreLight } from '@/lib/sceneSetup'
+import { useAnimationStore } from '@/stores/useAnimation'
+import { firstCameraPanDone, panCameraToBall } from '@/lib/animation/camera'
 import {
-  syncPatchDetach,
-  syncCoreLight,
   initCoreLightIntensityTween,
   fadeSceneIn,
   fadeBallIn,
-  bumpLightsUp,
-  rotateBallOnDrag
-} from '@/lib/objectAnimations'
-import {
-  fadeScrollHintsOut,
-  fadeScrollHintsIn,
-  initScrollHintTween,
-  fadeTitleIn
-} from '@/lib/uiAnimations'
-import { initBall, initEnvironment, initCoreLight } from '@/lib/sceneSetup'
+  bumpLightsUp
+} from '@/lib/animation/objects'
+import { fadeScrollHintsIn, initScrollHintTween, fadeTitleIn } from '@/lib/animation/ui'
+import { onMouseDown, onMouseMove, onMouseUp } from '@/lib/events/mouse'
+import { onScroll } from '@/lib/events/scroll'
+import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
+import TitleComponent from './TitleComponent.vue'
 import type { Ball } from '@/types'
-
-let firstCameraPanDone = false
 
 const canvasRef = ref<HTMLCanvasElement>()
 
@@ -47,15 +35,11 @@ const lenis = new Lenis()
 
 const animated = useAnimationStore()
 
-// THREE
 let renderer: WebGLRenderer | null = null
 let camera: PerspectiveCamera | null = null
 let scene = new Scene()
 
 const raycaster = new Raycaster()
-const mouse = new Vector2()
-let isBallClick = false
-let lastMousePos = new Vector2()
 
 const ball: Ball = { materials: [], detachablePatchMeshes: [] }
 
@@ -69,6 +53,7 @@ onMounted(async () => {
   init(canvas)
   await initScene()
   initAnimations()
+  initLenisScroll()
 
   initGUI(camera!, renderer!, { closed: true })
   initStats()
@@ -139,38 +124,18 @@ const animate = (timestamp: number) => {
   requestAnimationFrame(animate)
 }
 
-// SCROLL
-lenis.on('scroll', (event: any) => {
-  const { progress: scrollProgress } = event
-  if (scrollProgress > 0) {
-    fadeScrollHintsOut()
-  } else if (firstCameraPanDone && scrollProgress === 0) {
-    fadeScrollHintsIn()
-  }
-
-  if (scrollProgress <= 0.1) {
-    animated.title.blur = Math.min(44 * scrollProgress, 5)
-    animated.title.brightness = Math.max(1 - 4.4 * scrollProgress, 0.3)
-  }
-
-  const SPIN_FACTOR = 0.01
-  animated.targetBallSpin = event.velocity * SPIN_FACTOR
-
-  if (firstCameraPanDone && ball.detachablePatchMeshes?.length) {
-    syncPatchDetach(ball.detachablePatchMeshes, scrollProgress)
-    syncBallElevationWithCamera(ball.mesh!, camera!, scrollProgress)
-    syncCoreLight(coreLight.value!, ball.mesh!, scrollProgress)
-  }
-})
-
 const initAnimations = () => {
   initCoreLightIntensityTween(coreLight.value!)
   initScrollHintTween()
 }
 
-const triggerAnimations = async () => {
+const initLenisScroll = () => {
   lenis.scrollTo(0)
   lenis.isLocked = true
+  lenis.on('scroll', (event: any) => onScroll(event, camera!, ball, coreLight.value!))
+}
+
+const triggerAnimations = async () => {
   fadeSceneIn(renderer!)
 
   await new Promise((resolve) => setTimeout(resolve, 3300))
@@ -178,43 +143,13 @@ const triggerAnimations = async () => {
 
   await new Promise((resolve) => setTimeout(resolve, 1000))
   panCameraToBall(camera!, ball.mesh!, () => {
-    firstCameraPanDone = true
+    firstCameraPanDone.value = true
     lenis.isLocked = false
   })
   bumpLightsUp(renderer!)
   fadeTitleIn(() => {
     lenis.progress === 0 && fadeScrollHintsIn()
   })
-}
-
-function onMouseDown(event: MouseEvent) {
-  isBallClick = false
-
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
-
-  raycaster.setFromCamera(mouse, camera!)
-  const intersects = raycaster.intersectObject(ball.mesh!)
-
-  if (intersects.length > 0) {
-    isBallClick = true
-    lastMousePos.set(event.clientX, event.clientY)
-  }
-}
-
-function onMouseMove(event: MouseEvent) {
-  if (!isBallClick) return
-
-  const dx = event.clientX - lastMousePos.x
-  const dy = event.clientY - lastMousePos.y
-
-  rotateBallOnDrag(ball.mesh!, dx, dy)
-
-  lastMousePos.set(event.clientX, event.clientY)
-}
-
-function onMouseUp() {
-  isBallClick = false
 }
 </script>
 
@@ -223,9 +158,9 @@ function onMouseUp() {
   <canvas
     id="canvas"
     ref="canvasRef"
-    @mousedown.left="onMouseDown"
+    @mousedown.left="(e) => onMouseDown(e, ball, raycaster, camera!)"
     @mouseup.left="onMouseUp"
-    @mousemove="onMouseMove"
+    @mousemove="(e) => onMouseMove(e, ball)"
   />
 </template>
 

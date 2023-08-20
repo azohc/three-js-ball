@@ -1,5 +1,8 @@
 import { PerspectiveCamera, Mesh, Vector3, CubicBezierCurve3 } from 'three'
 import { gsap, Power3 } from 'gsap'
+import { ref } from 'vue'
+
+export const firstCameraPanDone = ref(false)
 
 export const panCameraToBall = (
   camera: PerspectiveCamera,

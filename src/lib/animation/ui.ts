@@ -1,5 +1,5 @@
 import { gsap, Power2, Power3 } from 'gsap'
-import { useAnimationStore } from '@/stores/animation'
+import { useAnimationStore } from '@/stores/useAnimation'
 
 let scrollHintInfiniteTween: gsap.core.Tween | null = null
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAnimationStore } from '@/stores/animation'
+import { useAnimationStore } from '@/stores/useAnimation'
 import { computed } from 'vue'
 
 const animated = useAnimationStore()
@@ -51,3 +51,4 @@ const scrollHintCS = computed(() => ({
   opacity: 0;
 }
 </style>
+@/stores/useAnimation
