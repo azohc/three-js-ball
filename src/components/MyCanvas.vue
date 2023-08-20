@@ -20,7 +20,8 @@ import {
   initCoreLightIntensityTween,
   fadeSceneIn,
   fadeBallIn,
-  bumpLightsUp
+  bumpLightsUp,
+  updateMomentum
 } from '@/lib/animation/objects'
 import { fadeScrollHintsIn, initScrollHintTween, fadeTitleIn } from '@/lib/animation/ui'
 import { onMouseDown, onMouseMove, onMouseUp } from '@/lib/events/mouse'
@@ -115,6 +116,8 @@ const animate = (timestamp: number) => {
   lenis.raf(timestamp)
 
   ball.mesh!.rotateZ(animated.targetBallSpin)
+
+  updateMomentum(ball.mesh!)
 
   // if (water) water.material.uniforms['time'].value += 1.0 / 60.0
   if (water) water.material.uniforms['time'].value += 1.0 / 120.0

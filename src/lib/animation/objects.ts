@@ -11,6 +11,13 @@ import { gsap, Power3 } from 'gsap'
 
 let coreLightIntensityTween: gsap.core.Tween | null = null
 
+let momentumX = 0
+let momentumY = 0
+const ballMomentumConfig = {
+  friction: 0.99,
+  threshold: 0.001
+}
+
 export const initCoreLightIntensityTween = (light: PointLight) =>
   (coreLightIntensityTween = gsap.fromTo(
     light,
@@ -50,6 +57,13 @@ export const syncCoreLight = (light: PointLight, ballMesh: Mesh, progress: numbe
 }
 
 export const rotateBallOnDrag = (ballMesh: Mesh, dx: number, dy: number) => {
+  momentumX = dx
+  momentumY = dy
+
+  applyRotation(ballMesh, dx, dy)
+}
+
+export const applyRotation = (ballMesh: Mesh, dx: number, dy: number) => {
   const rotationQuaternion = new Quaternion()
   const intensity = 0.01
 
@@ -58,4 +72,16 @@ export const rotateBallOnDrag = (ballMesh: Mesh, dx: number, dy: number) => {
 
   rotationQuaternion.setFromAxisAngle(new Vector3(1, 0, 0), -dy * intensity)
   ballMesh!.quaternion.multiply(rotationQuaternion)
+}
+
+export const updateMomentum = (ballMesh: Mesh) => {
+  const { threshold, friction } = ballMomentumConfig
+  if (Math.abs(momentumX) > threshold || Math.abs(momentumY) > threshold) {
+    applyRotation(ballMesh, momentumX, momentumY)
+    momentumX *= friction
+    momentumY *= friction
+  } else {
+    momentumX = 0
+    momentumY = 0
+  }
 }
