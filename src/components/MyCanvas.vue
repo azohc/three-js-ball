@@ -22,8 +22,7 @@ import {
   Material,
   PointLight,
   Raycaster,
-  Vector2,
-  Quaternion
+  Vector2
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
@@ -32,23 +31,24 @@ import { Sky } from 'three/addons/objects/Sky.js'
 import Lenis from '@studio-freight/lenis'
 
 import TitleComponent from './TitleComponent.vue'
-import { destroyDebugTools, initGUI, initStats } from '@/lib/debugUtils'
+import { beginStats, destroyDebugTools, endStats, initGUI, initStats } from '@/lib/debugUtils'
+import { useAnimationStore } from '@/stores/animation'
+import { syncBallElevationWithCamera, panCameraToBall } from '@/lib/cameraAnimations'
 import {
-  animate,
+  syncPatchDetach,
+  syncCoreLight,
+  initCoreLightIntensityTween,
   fadeSceneIn,
   fadeBallIn,
-  panCameraToBall,
   bumpLightsUp,
-  fadeTitleIn,
-  initScrollHintTween,
-  fadeScrollHintsIn,
+  rotateBallOnDrag
+} from '@/lib/objectAnimations'
+import {
   fadeScrollHintsOut,
-  syncPatchDetach,
-  syncBallElevationWithCamera,
-  initCoreLightIntensityTween,
-  syncCoreLight
-} from '@/lib/animation'
-import { useAnimationStore } from '@/stores/animation'
+  fadeScrollHintsIn,
+  initScrollHintTween,
+  fadeTitleIn
+} from '@/lib/uiAnimations'
 
 let firstCameraPanDone = false
 
@@ -92,7 +92,8 @@ onMounted(async () => {
   initStats()
 
   triggerAnimations()
-  requestAnimationFrame(() => animate(renderer!, scene, camera!, ballMesh!, water!, lenis))
+  // requestAnimationFrame(() => animate(renderer!, scene, camera!, ballMesh!, water!, lenis))
+  requestAnimationFrame(animate)
 })
 
 onUnmounted(() => {
@@ -140,6 +141,22 @@ const initScene = async () => {
   addEnvironment()
   addCoreLight()
   await addBall()
+}
+
+const animate = (timestamp: number) => {
+  beginStats()
+  lenis.raf(timestamp)
+
+  // TODO don't rotateZ if dragging ball
+  ballMesh!.rotateZ(animated.targetBallSpin)
+
+  // TODO add maxfps to controls to target specific framerates?
+  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+  // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
+
+  renderer && renderer.render(scene, camera!)
+  endStats()
+  requestAnimationFrame(animate)
 }
 
 // SCROLL
@@ -324,16 +341,7 @@ function onMouseMove(event: MouseEvent) {
   const dx = event.clientX - lastMousePos.x
   const dy = event.clientY - lastMousePos.y
 
-  let rotationQuaternion = new Quaternion()
-  let axis = new Vector3()
-  const intensity = 0.01
-
-  axis.set(0, 0, 1).normalize()
-  rotationQuaternion.setFromAxisAngle(new Vector3(0, 0, 1), dx * intensity)
-  ballMesh!.quaternion.multiply(rotationQuaternion)
-
-  rotationQuaternion.setFromAxisAngle(new Vector3(1, 0, 0), -dy * intensity)
-  ballMesh!.quaternion.multiply(rotationQuaternion)
+  rotateBallOnDrag(ballMesh!, dx, dy)
 
   lastMousePos.set(event.clientX, event.clientY)
 }
