@@ -20,7 +20,10 @@ import {
   PMREMGenerator,
   Scene,
   Material,
-  PointLight
+  PointLight,
+  Raycaster,
+  Vector2,
+  Quaternion
 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
@@ -59,6 +62,11 @@ const animated = useAnimationStore()
 let renderer: WebGLRenderer | null = null
 let camera: PerspectiveCamera | null = null
 let scene = new Scene()
+
+const raycaster = new Raycaster()
+const mouse = new Vector2()
+let isBallClick = false
+let lastMousePos = new Vector2()
 
 const textureLoader = new TextureLoader()
 const gltfLoader = new GLTFLoader()
@@ -294,12 +302,56 @@ const addEnvironment = () => {
   scene.environment = renderTarget.texture
   scene.background = renderTarget.texture
 }
+
+function onMouseDown(event: MouseEvent) {
+  isBallClick = false
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+  raycaster.setFromCamera(mouse, camera!)
+  const intersects = raycaster.intersectObject(ballMesh!)
+
+  if (intersects.length > 0) {
+    isBallClick = true
+    lastMousePos.set(event.clientX, event.clientY)
+  }
+}
+
+function onMouseMove(event: MouseEvent) {
+  if (!isBallClick) return
+
+  const dx = event.clientX - lastMousePos.x
+  const dy = event.clientY - lastMousePos.y
+
+  let rotationQuaternion = new Quaternion()
+  let axis = new Vector3()
+  const intensity = 0.01
+
+  axis.set(0, 0, 1).normalize()
+  rotationQuaternion.setFromAxisAngle(new Vector3(0, 0, 1), dx * intensity)
+  ballMesh!.quaternion.multiply(rotationQuaternion)
+
+  rotationQuaternion.setFromAxisAngle(new Vector3(1, 0, 0), -dy * intensity)
+  ballMesh!.quaternion.multiply(rotationQuaternion)
+
+  lastMousePos.set(event.clientX, event.clientY)
+}
+
+function onMouseUp() {
+  isBallClick = false
+}
 </script>
 
 <template>
   <TitleComponent />
-
-  <canvas id="canvas" ref="canvasRef" />
+  <canvas
+    id="canvas"
+    ref="canvasRef"
+    @mousedown.left="onMouseDown"
+    @mouseup.left="onMouseUp"
+    @mousemove="onMouseMove"
+  />
 </template>
 
 <style scoped>

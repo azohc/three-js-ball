@@ -58,6 +58,7 @@ export const animate = (
     beginStats()
     lenis.raf(timestamp)
 
+    // TODO don't rotateZ if dragging ball
     ballMesh.rotateZ(animated.targetBallSpin)
 
     // TODO add maxfps to controls to target specific framerates?
