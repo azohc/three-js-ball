@@ -183,7 +183,7 @@ const triggerAnimations = async () => {
   lenis.isLocked = true
   fadeSceneIn(renderer!)
 
-  await new Promise((resolve) => setTimeout(resolve, 2000))
+  await new Promise((resolve) => setTimeout(resolve, 3300))
   fadeBallIn(ballMeshMaterials)
 
   await new Promise((resolve) => setTimeout(resolve, 1000))

@@ -160,9 +160,9 @@ export const syncBallElevationWithCamera = (
 ) => {
   ballMesh.position.y = 1 + progress * 2
 
-  camera.position.y = 1 + progress * 1.1
-  camera.position.x = 1.5 - progress * 0.88
-  camera.position.z = 1 + progress * 0.44
+  camera.position.y = ballMesh.position.y
+  camera.position.x = 1.6 - progress * 2.44
+  camera.position.z = 1 + progress * 0.88
   camera.lookAt(ballMesh.position)
 }
 
