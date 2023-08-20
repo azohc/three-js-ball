@@ -6,7 +6,8 @@ hello there, thanks for dropping by. this is a simple vue app i've been playing 
 
 - vue 3 implementation using typescript and the composition api
 - three.js for 3d rendering
-- dynamic animations using gsap
+- interactivity via raytracing
+- dynamic animations using gsap and lenis
 - interactive gui for debugging and visualization adjustments with lil-gui
 - performance monitoring with stats.js
 
