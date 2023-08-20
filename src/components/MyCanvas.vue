@@ -6,27 +6,14 @@ import {
   PerspectiveCamera,
   WebGLRenderer,
   Vector3,
-  Mesh,
   SRGBColorSpace,
-  MeshBasicMaterial,
   ACESFilmicToneMapping,
-  Object3D,
-  RGBAFormat,
-  UnsignedByteType,
-  PlaneGeometry,
-  TextureLoader,
-  RepeatWrapping,
-  MathUtils,
-  PMREMGenerator,
   Scene,
-  Material,
   PointLight,
   Raycaster,
   Vector2
 } from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { Water } from 'three/addons/objects/Water.js'
-import { Sky } from 'three/addons/objects/Sky.js'
 
 import Lenis from '@studio-freight/lenis'
 
@@ -49,6 +36,8 @@ import {
   initScrollHintTween,
   fadeTitleIn
 } from '@/lib/uiAnimations'
+import { initBall, initEnvironment, initCoreLight } from '@/lib/sceneSetup'
+import type { Ball } from '@/types'
 
 let firstCameraPanDone = false
 
@@ -68,17 +57,10 @@ const mouse = new Vector2()
 let isBallClick = false
 let lastMousePos = new Vector2()
 
-const textureLoader = new TextureLoader()
-const gltfLoader = new GLTFLoader()
-
-let ballMesh: Mesh | null = null
-const ballMeshMaterials: Material[] = []
-const detachablePatchMeshes: Mesh[] = []
+const ball: Ball = { materials: [], detachablePatchMeshes: [] }
 
 let water: Water | null = null
-let sun: Vector3 | null = null
-
-let coreLight: PointLight | null = null
+const coreLight = ref<PointLight>()
 
 onMounted(async () => {
   const canvas = canvasRef.value
@@ -92,7 +74,6 @@ onMounted(async () => {
   initStats()
 
   triggerAnimations()
-  // requestAnimationFrame(() => animate(renderer!, scene, camera!, ballMesh!, water!, lenis))
   requestAnimationFrame(animate)
 })
 
@@ -138,23 +119,22 @@ const init = (canvas: HTMLCanvasElement) => {
 }
 
 const initScene = async () => {
-  addEnvironment()
-  addCoreLight()
-  await addBall()
+  water = initEnvironment(renderer!, scene)
+  initCoreLight(scene, coreLight)
+  await initBall(scene, ball)
+  camera?.lookAt(ball.mesh!.position)
 }
 
 const animate = (timestamp: number) => {
   beginStats()
   lenis.raf(timestamp)
 
-  // TODO don't rotateZ if dragging ball
-  ballMesh!.rotateZ(animated.targetBallSpin)
+  ball.mesh!.rotateZ(animated.targetBallSpin)
 
-  // TODO add maxfps to controls to target specific framerates?
-  if (water) water.material.uniforms['time'].value += 1.0 / 60.0
-  // if (water) water.material.uniforms['time'].value += 1.0 / 120.0
+  // if (water) water.material.uniforms['time'].value += 1.0 / 60.0
+  if (water) water.material.uniforms['time'].value += 1.0 / 120.0
 
-  renderer && renderer.render(scene, camera!)
+  renderer && camera && renderer.render(scene, camera)
   endStats()
   requestAnimationFrame(animate)
 }
@@ -169,37 +149,22 @@ lenis.on('scroll', (event: any) => {
   }
 
   if (scrollProgress <= 0.1) {
-    animated.titleBlur = Math.min(44 * scrollProgress, 5)
-    animated.titleBrightness = Math.max(1 - 4.4 * scrollProgress, 0.3)
+    animated.title.blur = Math.min(44 * scrollProgress, 5)
+    animated.title.brightness = Math.max(1 - 4.4 * scrollProgress, 0.3)
   }
 
   const SPIN_FACTOR = 0.01
   animated.targetBallSpin = event.velocity * SPIN_FACTOR
 
-  if (firstCameraPanDone && detachablePatchMeshes.length) {
-    syncPatchDetach(detachablePatchMeshes, scrollProgress)
-    syncBallElevationWithCamera(ballMesh!, camera!, scrollProgress)
-    syncCoreLight(coreLight!, ballMesh!, scrollProgress)
+  if (firstCameraPanDone && ball.detachablePatchMeshes?.length) {
+    syncPatchDetach(ball.detachablePatchMeshes, scrollProgress)
+    syncBallElevationWithCamera(ball.mesh!, camera!, scrollProgress)
+    syncCoreLight(coreLight.value!, ball.mesh!, scrollProgress)
   }
 })
 
-const addCoreLight = () => {
-  coreLight = new PointLight(0xb9973f, 0, 0, 10)
-  coreLight.castShadow = true
-  scene.add(coreLight)
-}
-
-const addBall = async () => {
-  try {
-    await loadBallMeshPromise()
-    scene.add(ballMesh!)
-  } catch (error) {
-    console.error(error)
-  }
-}
-
 const initAnimations = () => {
-  initCoreLightIntensityTween(coreLight!)
+  initCoreLightIntensityTween(coreLight.value!)
   initScrollHintTween()
 }
 
@@ -209,10 +174,10 @@ const triggerAnimations = async () => {
   fadeSceneIn(renderer!)
 
   await new Promise((resolve) => setTimeout(resolve, 3300))
-  fadeBallIn(ballMeshMaterials)
+  fadeBallIn(ball.materials!)
 
   await new Promise((resolve) => setTimeout(resolve, 1000))
-  panCameraToBall(camera!, ballMesh!, () => {
+  panCameraToBall(camera!, ball.mesh!, () => {
     firstCameraPanDone = true
     lenis.isLocked = false
   })
@@ -222,104 +187,6 @@ const triggerAnimations = async () => {
   })
 }
 
-const loadBallMeshPromise = async () =>
-  new Promise<void>((resolve, reject) => {
-    gltfLoader.load(
-      /**
-       * ball model optimized with gltf.report's simple_pipeline.js script:
-       *  -> remove duplicate vertex or texture data, if any.
-       *  -> losslessly resample animation frames.
-       *  -> remove unused nodes, textures, or other data.
-       *  -> resize all textures to ≤2k.
-       */
-      'ball_optimized.glb',
-      (gltf) => {
-        const uuid = gltf.scene.uuid
-        scene.add(gltf.scene)
-        const ballGroup = scene.children.find((c) => c.uuid === uuid)
-        if (ballGroup) {
-          ballMesh = ballGroup.children[0] as Mesh
-          const applyColorSpace = (object: Object3D) => {
-            if (object.type === 'Mesh') {
-              const material = (object as Mesh).material as MeshBasicMaterial
-              if (material.map) {
-                material.map.format = RGBAFormat
-                material.map.type = UnsignedByteType
-                material.map.colorSpace = SRGBColorSpace
-              }
-              material.transparent = true
-              material.opacity = 0
-              ballMeshMaterials.push(material)
-            }
-            if (object.children && object.children.length > 0) {
-              object.children.forEach(applyColorSpace)
-            }
-          }
-          applyColorSpace(ballMesh)
-
-          ballMesh.children[0].children.forEach(
-            (o3d, i) => i > 0 && detachablePatchMeshes.push(o3d as Mesh)
-          )
-
-          ballMesh.position.y = 1
-          camera?.lookAt(ballMesh.position)
-          resolve()
-        }
-      },
-      undefined,
-      reject
-    )
-  })
-
-const addEnvironment = () => {
-  sun = new Vector3()
-  water = new Water(new PlaneGeometry(10000, 10000), {
-    textureWidth: 512,
-    textureHeight: 512,
-    waterNormals: textureLoader.load('waternormals.jpg', function (texture) {
-      texture.wrapS = texture.wrapT = RepeatWrapping
-    }),
-    sunDirection: new Vector3(),
-    sunColor: 0xf7cd5d,
-    waterColor: 0x001e0f,
-    distortionScale: 3.7,
-    fog: scene.fog !== undefined
-  })
-  water.rotation.x = -Math.PI / 2
-  scene.add(water)
-
-  // Skybox
-  const sky = new Sky()
-  sky.scale.setScalar(10000)
-  scene.add(sky)
-
-  const skyUniforms = sky.material.uniforms
-
-  skyUniforms['turbidity'].value = 10
-  skyUniforms['rayleigh'].value = 2
-  skyUniforms['mieCoefficient'].value = 0.005
-  skyUniforms['mieDirectionalG'].value = 0.8
-
-  const elevation = 0.5
-  const azimuth = 180
-
-  const pmremGenerator = new PMREMGenerator(renderer!)
-
-  const phi = MathUtils.degToRad(90 - elevation)
-  const theta = MathUtils.degToRad(azimuth)
-
-  sun.setFromSphericalCoords(1, phi, theta)
-
-  sky.material.uniforms['sunPosition'].value.copy(sun)
-  water.material.uniforms['sunDirection'].value.copy(sun).normalize()
-
-  const skyScene = new Scene()
-  skyScene.add(sky)
-  const renderTarget = pmremGenerator.fromScene(skyScene)
-  scene.environment = renderTarget.texture
-  scene.background = renderTarget.texture
-}
-
 function onMouseDown(event: MouseEvent) {
   isBallClick = false
 
@@ -327,7 +194,7 @@ function onMouseDown(event: MouseEvent) {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
 
   raycaster.setFromCamera(mouse, camera!)
-  const intersects = raycaster.intersectObject(ballMesh!)
+  const intersects = raycaster.intersectObject(ball.mesh!)
 
   if (intersects.length > 0) {
     isBallClick = true
@@ -341,7 +208,7 @@ function onMouseMove(event: MouseEvent) {
   const dx = event.clientX - lastMousePos.x
   const dy = event.clientY - lastMousePos.y
 
-  rotateBallOnDrag(ballMesh!, dx, dy)
+  rotateBallOnDrag(ball.mesh!, dx, dy)
 
   lastMousePos.set(event.clientX, event.clientY)
 }

@@ -5,13 +5,13 @@ import { computed } from 'vue'
 const animated = useAnimationStore()
 
 const titleCS = computed(() => ({
-  opacity: animated.titleOpacity,
-  filter: `blur(${animated.titleBlur}px) brightness(${animated.titleBrightness})`
+  opacity: animated.title.opacity,
+  filter: `blur(${animated.title.blur}px) brightness(${animated.title.brightness})`
 }))
 
 const scrollHintCS = computed(() => ({
-  opacity: animated.scrollHintOpacity,
-  transform: `translateY(${animated.scrollHintTranslateY})`
+  opacity: animated.scrollHints.opacity,
+  transform: `translateY(${animated.scrollHints.translateY})`
 }))
 </script>
 

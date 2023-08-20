@@ -6,10 +6,10 @@ let scrollHintInfiniteTween: gsap.core.Tween | null = null
 export const initScrollHintTween = () => {
   const animated = useAnimationStore()
   scrollHintInfiniteTween = gsap.fromTo(
-    animated,
-    { scrollHintTranslateY: '0px' },
+    animated.scrollHints,
+    { translateY: '0px' },
     {
-      scrollHintTranslateY: '7px',
+      translateY: '7px',
       yoyoEase: Power2.easeOut,
       delay: 0.22,
       repeatDelay: 0.11,
@@ -23,8 +23,8 @@ export const initScrollHintTween = () => {
 
 export const fadeTitleIn = (onComplete: () => void) => {
   const animated = useAnimationStore()
-  gsap.to(animated, {
-    titleOpacity: 1,
+  gsap.to(animated.title, {
+    opacity: 1,
     ease: Power3.easeIn,
     duration: 5,
     delay: 3,
@@ -34,8 +34,8 @@ export const fadeTitleIn = (onComplete: () => void) => {
 
 export const fadeScrollHintsIn = () => {
   const animated = useAnimationStore()
-  gsap.to(animated, {
-    scrollHintOpacity: 1,
+  gsap.to(animated.scrollHints, {
+    opacity: 1,
     delay: 2.2,
     duration: 1.1,
     ease: Power3.easeIn,
@@ -47,8 +47,8 @@ export const fadeScrollHintsIn = () => {
 
 export const fadeScrollHintsOut = () => {
   const animated = useAnimationStore()
-  gsap.to(animated, {
-    scrollHintOpacity: 0,
+  gsap.to(animated.scrollHints, {
+    opacity: 0,
     ease: Power3.easeOut,
     duration: 2,
     onComplete: () => {

@@ -2,21 +2,22 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
 export const useAnimationStore = defineStore('animation', () => {
-  const titleOpacity = ref(0)
-  const titleBlur = ref(0)
-  const titleBrightness = ref(1)
+  const title = ref({
+    opacity: 0,
+    blur: 0,
+    brightness: 1
+  })
 
-  const scrollHintOpacity = ref(0)
-  const scrollHintTranslateY = ref(0)
+  const scrollHints = ref({
+    opacity: 0,
+    translateY: 0
+  })
 
   const targetBallSpin = ref(0)
 
   return {
-    titleOpacity,
-    titleBlur,
-    titleBrightness,
-    scrollHintOpacity,
-    scrollHintTranslateY,
+    title,
+    scrollHints,
     targetBallSpin
   }
 })
